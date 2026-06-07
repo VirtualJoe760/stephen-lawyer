@@ -1,4 +1,5 @@
 "use client";
+import Link from "next/link";
 import { useCallback, useRef, useState } from "react";
 import {
   ReactFlow,
@@ -303,10 +304,24 @@ function DesignerInner({ catalogue, catalogues, initialNodes, designs }: Props) 
   return (
     <div className="flex h-[100dvh] flex-col bg-ink text-bone">
       <header className="flex items-center gap-3 border-b border-bone/10 px-3 py-2">
+        <Link
+          href="/admin"
+          className="shrink-0 text-xs font-mono uppercase tracking-widest text-bone/60 hover:text-hazard"
+          title="Back to admin dashboard"
+        >
+          ‹ Admin
+        </Link>
         <CatalogueSwitcher current={catalogue} catalogues={catalogues} />
         <div className="min-w-0 flex-1">
           <DesignsHistoryBar designs={designList} onAdd={addDesign} />
         </div>
+        <Link
+          href="/"
+          className="hidden shrink-0 text-xs font-mono uppercase tracking-widest text-bone/60 hover:text-hazard sm:block"
+          title="View storefront"
+        >
+          Store ↗
+        </Link>
       </header>
 
       <div className="relative flex min-h-0 flex-1">

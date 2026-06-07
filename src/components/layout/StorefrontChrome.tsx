@@ -1,6 +1,7 @@
 "use client";
 import { usePathname } from "next/navigation";
 import type { ReactNode } from "react";
+import { MobileTabBar } from "./MobileTabBar";
 
 // Hides the storefront chrome (ticker/header/footer/cart) on /admin/* so the
 // design generator can run full-screen. Storefront routes render identically to
@@ -27,7 +28,10 @@ export function StorefrontChrome({
       {header}
       <main className="flex-1">{children}</main>
       {footer}
+      {/* spacer so the fixed mobile tab bar never covers the footer */}
+      <div className="h-14 lg:hidden" aria-hidden />
       {drawer}
+      <MobileTabBar />
     </>
   );
 }
