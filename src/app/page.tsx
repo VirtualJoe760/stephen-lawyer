@@ -16,8 +16,8 @@ export default async function Home() {
       {/* Hero */}
       <section className="relative w-full" style={{ height: "min(80vh, 720px)" }}>
         <Image
-          src="https://images.unsplash.com/photo-1517457373958-b7bdd4587205?w=2400&q=85"
-          alt=""
+          src="/hero.png"
+          alt="Stephen Lawyer grinding a rail"
           priority
           fill
           sizes="100vw"
