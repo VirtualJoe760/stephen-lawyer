@@ -211,3 +211,20 @@ export async function getCatalogVariant(id: number): Promise<PrintfulCatalogVari
   const result = await request<{ variant: PrintfulCatalogVariant }>(`/products/variant/${id}`);
   return result.variant;
 }
+
+export interface PrintfulCatalogProduct {
+  id: number;
+  type: string;
+  title: string;
+  image: string;
+  variant_count: number;
+}
+
+// GET /products/{id} → catalog product + its variants (for filling templates.ts).
+export async function getCatalogProduct(
+  id: number,
+): Promise<{ product: PrintfulCatalogProduct; variants: PrintfulCatalogVariant[] }> {
+  return request<{ product: PrintfulCatalogProduct; variants: PrintfulCatalogVariant[] }>(
+    `/products/${id}`,
+  );
+}
