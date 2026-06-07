@@ -4,7 +4,7 @@ import { requireAdminPage } from "@/lib/admin/auth";
 import { db } from "@/lib/db";
 import { compositions } from "@/db/schema";
 import { getTemplate } from "@/lib/printful/templates";
-import { getCatalogVariant } from "@/lib/printful/client";
+import { getCatalogProduct } from "@/lib/printful/client";
 import { FinalizeForm, type FinalizeVariant } from "@/components/admin/FinalizeForm";
 
 export const dynamic = "force-dynamic";
@@ -22,16 +22,20 @@ export default async function FinalizePage({ params }: { params: Promise<{ id: s
   // configured variantIds). On failure we surface guidance instead of blocking.
   let variants: FinalizeVariant[] = [];
   let variantsError: string | null = null;
-  if (tpl && tpl.variantIds.length) {
+  if (tpl && tpl.printfulProductId && tpl.variantIds.length) {
     try {
-      const fetched = await Promise.all(tpl.variantIds.map((vid) => getCatalogVariant(vid)));
-      variants = fetched.map((v) => ({
-        id: v.id,
-        name: v.name,
-        size: v.size,
-        color: v.color,
-        priceCents: Math.round(Number(v.price) * 100),
-      }));
+      // One catalog call, filtered to this template's curated variant IDs.
+      const { variants: all } = await getCatalogProduct(tpl.printfulProductId);
+      const want = new Set(tpl.variantIds);
+      variants = all
+        .filter((v) => want.has(v.id))
+        .map((v) => ({
+          id: v.id,
+          name: v.name,
+          size: v.size,
+          color: v.color,
+          priceCents: Math.round(Number(v.price) * 100),
+        }));
     } catch (e) {
       variantsError = `Couldn't load Printful variants: ${e instanceof Error ? e.message : String(e)}`;
     }
