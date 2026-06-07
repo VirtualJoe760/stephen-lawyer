@@ -222,6 +222,22 @@ export interface PrintfulCatalogProduct {
   variant_count: number;
 }
 
+export interface ProductPlacements {
+  available: Record<string, string>; // placement key -> human label
+  allOver: boolean; // true if the product supports all-over (dye-on-fabric) printing
+}
+
+// GET /mockup-generator/printfiles/{id} → which print areas a product supports
+// (front/back/sleeves/labels/embroidery, and *_dtfabric for all-over).
+export async function getProductPlacements(productId: number): Promise<ProductPlacements> {
+  const r = await request<{ available_placements?: Record<string, string> }>(
+    `/mockup-generator/printfiles/${productId}`,
+  );
+  const available = r.available_placements ?? {};
+  const allOver = Object.keys(available).some((k) => /dtfabric|all[_-]?over/i.test(k));
+  return { available, allOver };
+}
+
 // GET /products/{id} → catalog product + its variants.
 export async function getCatalogProduct(
   id: number,

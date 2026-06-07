@@ -23,6 +23,8 @@ import { DesignsHistoryBar } from "./DesignsHistoryBar";
 import { ChatPanel } from "./ChatPanel";
 import { CatalogueSwitcher } from "./CatalogueSwitcher";
 import { CompositionModal } from "./CompositionModal";
+import { DesignerToolbar, type ToolMode } from "./DesignerToolbar";
+import { CombineDialog, type CombineTarget } from "./CombineDialog";
 
 export interface CanvasNodeRow {
   id: string;
@@ -60,6 +62,12 @@ const nodeTypes: NodeTypes = {
   composition: CompositionNode,
 };
 
+const SIZES = {
+  template: { width: 130, height: 165 },
+  design: { width: 130, height: 155 },
+  composition: { width: 155, height: 185 },
+};
+
 function str(data: unknown, key: string): string {
   const v = (data as Record<string, unknown>)[key];
   return typeof v === "string" ? v : "";
@@ -74,8 +82,8 @@ interface Box {
 const boxOf = (n: Node): Box => ({
   x: n.position.x,
   y: n.position.y,
-  w: n.measured?.width ?? 160,
-  h: n.measured?.height ?? 160,
+  w: n.measured?.width ?? n.width ?? 130,
+  h: n.measured?.height ?? n.height ?? 160,
 });
 const overlaps = (a: Box, b: Box) =>
   a.x < b.x + b.w && a.x + a.w > b.x && a.y < b.y + b.h && a.y + a.h > b.y;
@@ -92,14 +100,27 @@ function rowToFlowNode(
       id: r.id,
       type: "design",
       position,
+      ...SIZES.design,
       data: { designId: r.refId, thumbUrl: d?.thumbUrl, prompt: d?.prompt },
     };
   }
   if (r.kind === "composition") {
-    return { id: r.id, type: "composition", position, data: { compositionId: r.refId, status: "draft" } };
+    return {
+      id: r.id,
+      type: "composition",
+      position,
+      ...SIZES.composition,
+      data: { compositionId: r.refId, status: "draft" },
+    };
   }
   const b = blanksById.get(r.refId);
-  return { id: r.id, type: "template", position, data: { productId: r.refId, name: b?.name, image: b?.image } };
+  return {
+    id: r.id,
+    type: "template",
+    position,
+    ...SIZES.template,
+    data: { productId: r.refId, name: b?.name, image: b?.image },
+  };
 }
 
 function flowNodeToRow(n: Node): CanvasNodeRow {
@@ -129,6 +150,8 @@ function DesignerInner({ catalogue, catalogues, initialNodes, designs, blanks }:
   );
   const [designList, setDesignList] = useState<DesignRow[]>(designs);
   const [modalCompId, setModalCompId] = useState<string | null>(null);
+  const [toolMode, setToolMode] = useState<ToolMode>("select");
+  const [combineTarget, setCombineTarget] = useState<CombineTarget | null>(null);
   const saveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const persist = useCallback(
@@ -160,6 +183,7 @@ function DesignerInner({ catalogue, catalogues, initialNodes, designs, blanks }:
         id: crypto.randomUUID(),
         type: "template",
         position: centerPosition(),
+        ...SIZES.template,
         data: { productId: String(blank.id), name: blank.name, image: blank.image },
       };
       setNodes((cur) => {
@@ -177,6 +201,7 @@ function DesignerInner({ catalogue, catalogues, initialNodes, designs, blanks }:
         id: crypto.randomUUID(),
         type: "design",
         position: centerPosition(),
+        ...SIZES.design,
         data: { designId: d.id, thumbUrl: d.thumbUrl, prompt: d.prompt },
       };
       setNodes((cur) => {
@@ -192,7 +217,8 @@ function DesignerInner({ catalogue, catalogues, initialNodes, designs, blanks }:
     (changes: NodeChange[]) => {
       setNodes((cur) => {
         const next = applyNodeChanges(changes, cur);
-        if (changes.some((c) => c.type === "position" || c.type === "remove")) persist(next);
+        if (changes.some((c) => c.type === "position" || c.type === "remove" || c.type === "dimensions"))
+          persist(next);
         return next;
       });
     },
@@ -200,13 +226,20 @@ function DesignerInner({ catalogue, catalogues, initialNodes, designs, blanks }:
   );
 
   const createComposition = useCallback(
-    async (designId: string, productId: string, mockupUrl: string, position: { x: number; y: number }) => {
+    async (
+      designId: string,
+      productId: string,
+      mockupUrl: string,
+      placement: string,
+      position: { x: number; y: number },
+    ) => {
       if (!designId || !productId) return;
       const tempId = crypto.randomUUID();
       const skeleton: Node = {
         id: tempId,
         type: "composition",
         position,
+        ...SIZES.composition,
         data: { compositionId: "", status: "generating" },
       };
       setNodes((cur) => [...cur, skeleton]);
@@ -219,6 +252,7 @@ function DesignerInner({ catalogue, catalogues, initialNodes, designs, blanks }:
             designId,
             templateKey: productId,
             mockupUrl,
+            placement,
             x: Math.round(position.x),
             y: Math.round(position.y),
           }),
@@ -248,6 +282,7 @@ function DesignerInner({ catalogue, catalogues, initialNodes, designs, blanks }:
     [catalogue.id, persist],
   );
 
+  // Drag a design onto a template → quick composite (front placement).
   const onNodeDragStop = useCallback(
     (_e: unknown, dragged: Node) => {
       if (dragged.type !== "design") return;
@@ -255,12 +290,10 @@ function DesignerInner({ catalogue, catalogues, initialNodes, designs, blanks }:
       const dBox = boxOf(dragged);
       const tpl = all.find((n) => n.type === "template" && overlaps(dBox, boxOf(n)));
       if (tpl) {
-        createComposition(
-          str(dragged.data, "designId"),
-          str(tpl.data, "productId"),
-          str(tpl.data, "image"),
-          { x: dragged.position.x + 70, y: dragged.position.y + 70 },
-        );
+        createComposition(str(dragged.data, "designId"), str(tpl.data, "productId"), str(tpl.data, "image"), "front", {
+          x: dragged.position.x + 70,
+          y: dragged.position.y + 70,
+        });
       }
     },
     [rf, createComposition],
@@ -282,6 +315,31 @@ function DesignerInner({ catalogue, catalogues, initialNodes, designs, blanks }:
       });
     },
     [persist],
+  );
+
+  // Toolbar "Combine": from the current selection, take a design + a template and
+  // open the placement dialog.
+  const onCombine = useCallback(() => {
+    const sel = rf.getNodes().filter((n) => n.selected);
+    const design = sel.find((n) => n.type === "design");
+    const template = sel.find((n) => n.type === "template");
+    if (!design || !template) return;
+    setCombineTarget({
+      design: { designId: str(design.data, "designId") },
+      template: {
+        productId: str(template.data, "productId"),
+        name: str(template.data, "name"),
+        image: str(template.data, "image"),
+        position: { x: template.position.x + 70, y: template.position.y + 70 },
+      },
+    });
+  }, [rf]);
+
+  const canCombine = useMemo(
+    () =>
+      nodes.some((n) => n.selected && n.type === "design") &&
+      nodes.some((n) => n.selected && n.type === "template"),
+    [nodes],
   );
 
   const onPrompt = useCallback(
@@ -338,6 +396,7 @@ function DesignerInner({ catalogue, catalogues, initialNodes, designs, blanks }:
         </aside>
 
         <div id="designer-flow" className="relative min-w-0 flex-1">
+          <DesignerToolbar mode={toolMode} onMode={setToolMode} onCombine={onCombine} canCombine={canCombine} />
           <ReactFlow
             nodes={nodes}
             onNodesChange={onNodesChange}
@@ -345,6 +404,8 @@ function DesignerInner({ catalogue, catalogues, initialNodes, designs, blanks }:
             onNodeClick={onNodeClick}
             nodeTypes={nodeTypes}
             nodesConnectable={false}
+            selectionOnDrag={toolMode === "box"}
+            panOnDrag={toolMode === "box" ? [1, 2] : true}
             fitView
             minZoom={0.2}
             maxZoom={2}
@@ -373,6 +434,18 @@ function DesignerInner({ catalogue, catalogues, initialNodes, designs, blanks }:
           compositionId={modalCompId}
           onClose={() => setModalCompId(null)}
           onDiscarded={onDiscarded}
+        />
+      ) : null}
+
+      {combineTarget ? (
+        <CombineDialog
+          target={combineTarget}
+          onCancel={() => setCombineTarget(null)}
+          onConfirm={(placement) => {
+            const t = combineTarget;
+            setCombineTarget(null);
+            createComposition(t.design.designId, t.template.productId, t.template.image, placement, t.template.position);
+          }}
         />
       ) : null}
     </div>

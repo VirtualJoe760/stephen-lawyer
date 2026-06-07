@@ -1,6 +1,6 @@
 "use client";
 import { memo, useState } from "react";
-import { useReactFlow, type NodeProps } from "@xyflow/react";
+import { NodeResizer, useReactFlow, type NodeProps } from "@xyflow/react";
 
 export type TemplateNodeData = {
   productId: string;
@@ -35,7 +35,6 @@ export const TemplateNode = memo(function TemplateNode({ id, data, selected }: N
       }
     }
   }
-
   function pick(c: ColorOpt) {
     updateNodeData(id, { image: c.image || d.image, selectedColor: c.color });
     setOpen(false);
@@ -43,10 +42,17 @@ export const TemplateNode = memo(function TemplateNode({ id, data, selected }: N
 
   return (
     <div
-      className={`relative w-40 select-none rounded-md border bg-ink-soft p-3 text-bone shadow-lg ${
+      className={`relative flex h-full w-full flex-col rounded-md border bg-ink-soft p-2 text-bone shadow-lg ${
         selected ? "border-hazard" : "border-bone/20"
       }`}
     >
+      <NodeResizer
+        minWidth={92}
+        minHeight={112}
+        isVisible={!!selected}
+        lineClassName="!border-hazard/60"
+        handleClassName="!h-2 !w-2 !rounded-sm !border-hazard !bg-hazard"
+      />
       <button
         onMouseDown={(e) => e.stopPropagation()}
         onClick={(e) => {
@@ -54,33 +60,37 @@ export const TemplateNode = memo(function TemplateNode({ id, data, selected }: N
           deleteElements({ nodes: [{ id }] });
         }}
         title="Remove from canvas"
-        className="absolute -right-2 -top-2 z-10 flex h-5 w-5 items-center justify-center rounded-full border border-bone/20 bg-ink text-xs leading-none text-bone/70 hover:border-hazard hover:text-hazard"
+        className="absolute -right-2 -top-2 z-20 flex h-5 w-5 items-center justify-center rounded-full border border-bone/20 bg-ink text-xs leading-none text-bone/70 hover:border-hazard hover:text-hazard"
       >
         ×
       </button>
-      <div className="flex aspect-square items-center justify-center overflow-hidden rounded bg-bone/5">
+      <div className="min-h-0 flex-1 overflow-hidden rounded bg-bone/5">
         {d.image ? (
           // eslint-disable-next-line @next/next/no-img-element
           <img src={d.image} alt={d.name ?? "blank"} className="h-full w-full object-contain" draggable={false} />
         ) : (
-          <span className="text-[10px] font-mono uppercase tracking-widest text-bone/40">Blank</span>
+          <div className="flex h-full items-center justify-center text-[10px] font-mono uppercase tracking-widest text-bone/40">
+            Blank
+          </div>
         )}
       </div>
-      <p className="mt-2 truncate text-xs font-mono uppercase tracking-wide">{d.name ?? d.productId}</p>
-
+      <p className="mt-1 truncate text-[10px] font-mono uppercase tracking-wide">{d.name ?? d.productId}</p>
       <button
         onMouseDown={(e) => e.stopPropagation()}
         onClick={(e) => {
           e.stopPropagation();
           toggleColors();
         }}
-        className="mt-1 flex w-full items-center justify-between text-[10px] font-mono uppercase tracking-wide text-bone/50 hover:text-hazard"
+        className="flex w-full items-center justify-between text-[9px] font-mono uppercase tracking-wide text-bone/50 hover:text-hazard"
       >
         <span className="truncate">{d.selectedColor || "Color"}</span>
         <span>{open ? "▴" : "▾"}</span>
       </button>
       {open ? (
-        <div className="mt-1 flex max-h-24 flex-wrap gap-1 overflow-y-auto" onMouseDown={(e) => e.stopPropagation()}>
+        <div
+          className="absolute left-0 right-0 top-full z-30 mt-1 flex max-h-28 flex-wrap gap-1 overflow-y-auto rounded border border-bone/15 bg-ink-soft p-1"
+          onMouseDown={(e) => e.stopPropagation()}
+        >
           {loading ? <span className="text-[10px] text-bone/40">Loading…</span> : null}
           {colors && !colors.length && !loading ? <span className="text-[10px] text-bone/40">No colors</span> : null}
           {colors?.map((c) => (
@@ -91,9 +101,7 @@ export const TemplateNode = memo(function TemplateNode({ id, data, selected }: N
                 e.stopPropagation();
                 pick(c);
               }}
-              className={`h-5 w-5 rounded-full border ${
-                d.selectedColor === c.color ? "border-hazard" : "border-bone/30"
-              }`}
+              className={`h-5 w-5 rounded-full border ${d.selectedColor === c.color ? "border-hazard" : "border-bone/30"}`}
               style={{ background: c.colorCode || "#888888" }}
             />
           ))}

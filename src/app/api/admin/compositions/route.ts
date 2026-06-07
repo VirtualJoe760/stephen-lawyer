@@ -54,10 +54,13 @@ export async function POST(req: Request) {
     if (!mockup) {
       throw new Error("No mockup image available for this blank");
     }
-    const instruction =
-      `Place the provided graphic naturally on the ${placement.replace(/_/g, " ")} of the ${blank.name}. ` +
-      "Realistic fabric drape, soft studio lighting, neutral background. " +
-      "The graphic must remain clearly readable and not distort.";
+    const isAllOver = /dtfabric|all[_-]?over/i.test(placement);
+    const instruction = isAllOver
+      ? `Apply the provided graphic as a seamless all-over print covering the entire ${blank.name}. ` +
+        "Realistic fabric drape, soft studio lighting, neutral background."
+      : `Place the provided graphic naturally on the ${placement.replace(/_/g, " ")} of the ${blank.name}. ` +
+        "Realistic fabric drape, soft studio lighting, neutral background. " +
+        "The graphic must remain clearly readable and not distort.";
     const png = await composeOnGarment(design.url, mockup, instruction);
     const uploaded = await uploadImage(png, { folder: `stephen-lawyer/compositions/${comp.id}` });
     const [updated] = await db
