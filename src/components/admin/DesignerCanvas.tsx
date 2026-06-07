@@ -155,7 +155,10 @@ function DesignerInner({ catalogue, catalogues, initialNodes, designs, blanks }:
   const rf = useReactFlow();
   const blanksById = useMemo(() => new Map(blanks.map((b) => [String(b.id), b])), [blanks]);
   const [nodes, setNodes] = useState<Node[]>(() =>
-    initialNodes.map((r) => rowToFlowNode(r, designs, blanksById)),
+    initialNodes
+      // Drop legacy "+"/"=" separator labels saved by earlier versions.
+      .filter((r) => !(r.kind === "label" && (r.refId === "+" || r.refId === "=")))
+      .map((r) => rowToFlowNode(r, designs, blanksById)),
   );
   const [designList, setDesignList] = useState<DesignRow[]>(designs);
   const [modalCompId, setModalCompId] = useState<string | null>(null);
@@ -236,8 +239,8 @@ function DesignerInner({ catalogue, catalogues, initialNodes, designs, blanks }:
     [persist],
   );
 
-  // Combine a design + product → a horizontal group: design + product = composite,
-  // with "+"/"=" separators and an editable group-name label above.
+  // Combine a design + product → a horizontal group (design, product, composite)
+  // with an editable group-name label above.
   const combine = useCallback(
     async (target: CombineTarget, placement: string) => {
       const { design, template } = target;
@@ -248,10 +251,7 @@ function DesignerInner({ catalogue, catalogues, initialNodes, designs, blanks }:
       const compositePos = { x: gx + 2 * COL, y: gy };
       const tempId = crypto.randomUUID();
       const nameId = crypto.randomUUID();
-      const plusId = crypto.randomUUID();
-      const eqId = crypto.randomUUID();
-      const groupNum =
-        nodes.filter((n) => n.type === "label" && !["+", "="].includes(str(n.data, "text"))).length + 1;
+      const groupNum = nodes.filter((n) => n.type === "label").length + 1;
 
       setNodes((cur) => {
         const next = cur
@@ -262,8 +262,6 @@ function DesignerInner({ catalogue, catalogues, initialNodes, designs, blanks }:
           })
           .concat([
             { id: nameId, type: "label", position: { x: gx, y: gy - 30 }, data: { text: `Group ${groupNum}` } },
-            { id: plusId, type: "label", position: { x: gx + 134, y: gy + 64 }, data: { text: "+" } },
-            { id: eqId, type: "label", position: { x: gx + COL + 134, y: gy + 64 }, data: { text: "=" } },
             {
               id: tempId,
               type: "composition",
