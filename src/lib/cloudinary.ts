@@ -53,10 +53,17 @@ export function thumbUrl(publicId: string, size = 256): string {
   });
 }
 
-/** Print-ready upscaled URL (Cloudinary AI upscale to `width`px, default 4500). */
+/**
+ * Print-ready upscaled URL (default 4500px wide → ≥150 DPI on a tee front).
+ *
+ * Uses plain high-res scale (`c_scale`), which requires no add-on. The Cloudinary
+ * AI Upscale add-on (`e_upscale`) is NOT enabled on this account (returns 400),
+ * so for sharper print quality either enable that add-on and switch the
+ * transform to `{ effect: "upscale", width }`, or wire Replicate Real-ESRGAN.
+ */
 export function upscaledPrintUrl(publicId: string, width = 4500): string {
   return cloudinary.url(publicId, {
     secure: true,
-    transformation: [{ effect: "upscale", width }],
+    transformation: [{ width, crop: "scale" }],
   });
 }
