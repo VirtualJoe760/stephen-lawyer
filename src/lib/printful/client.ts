@@ -202,6 +202,8 @@ export interface PrintfulCatalogVariant {
   name: string;
   size: string;
   color: string;
+  color_code: string;
+  image: string;
   in_stock: boolean;
   price: string;
 }

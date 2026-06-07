@@ -1,12 +1,46 @@
 "use client";
-import { memo } from "react";
+import { memo, useState } from "react";
 import { useReactFlow, type NodeProps } from "@xyflow/react";
 
-export type TemplateNodeData = { productId: string; name?: string; image?: string };
+export type TemplateNodeData = {
+  productId: string;
+  name?: string;
+  image?: string;
+  selectedColor?: string;
+};
+interface ColorOpt {
+  color: string;
+  colorCode: string;
+  image: string;
+}
 
 export const TemplateNode = memo(function TemplateNode({ id, data, selected }: NodeProps) {
-  const { deleteElements } = useReactFlow();
+  const { deleteElements, updateNodeData } = useReactFlow();
   const d = data as TemplateNodeData;
+  const [open, setOpen] = useState(false);
+  const [colors, setColors] = useState<ColorOpt[] | null>(null);
+  const [loading, setLoading] = useState(false);
+
+  async function toggleColors() {
+    const next = !open;
+    setOpen(next);
+    if (next && colors === null && !loading) {
+      setLoading(true);
+      try {
+        const r = await fetch(`/api/admin/blank/${d.productId}/colors`);
+        const j = (await r.json().catch(() => ({}))) as { colors?: ColorOpt[] };
+        setColors(Array.isArray(j.colors) ? j.colors : []);
+      } finally {
+        setLoading(false);
+      }
+    }
+  }
+
+  function pick(c: ColorOpt) {
+    updateNodeData(id, { image: c.image || d.image, selectedColor: c.color });
+    setOpen(false);
+  }
+
   return (
     <div
       className={`relative w-40 select-none rounded-md border bg-ink-soft p-3 text-bone shadow-lg ${
@@ -33,6 +67,38 @@ export const TemplateNode = memo(function TemplateNode({ id, data, selected }: N
         )}
       </div>
       <p className="mt-2 truncate text-xs font-mono uppercase tracking-wide">{d.name ?? d.productId}</p>
+
+      <button
+        onMouseDown={(e) => e.stopPropagation()}
+        onClick={(e) => {
+          e.stopPropagation();
+          toggleColors();
+        }}
+        className="mt-1 flex w-full items-center justify-between text-[10px] font-mono uppercase tracking-wide text-bone/50 hover:text-hazard"
+      >
+        <span className="truncate">{d.selectedColor || "Color"}</span>
+        <span>{open ? "▴" : "▾"}</span>
+      </button>
+      {open ? (
+        <div className="mt-1 flex max-h-24 flex-wrap gap-1 overflow-y-auto" onMouseDown={(e) => e.stopPropagation()}>
+          {loading ? <span className="text-[10px] text-bone/40">Loading…</span> : null}
+          {colors && !colors.length && !loading ? <span className="text-[10px] text-bone/40">No colors</span> : null}
+          {colors?.map((c) => (
+            <button
+              key={c.color}
+              title={c.color}
+              onClick={(e) => {
+                e.stopPropagation();
+                pick(c);
+              }}
+              className={`h-5 w-5 rounded-full border ${
+                d.selectedColor === c.color ? "border-hazard" : "border-bone/30"
+              }`}
+              style={{ background: c.colorCode || "#888888" }}
+            />
+          ))}
+        </div>
+      ) : null}
     </div>
   );
 });

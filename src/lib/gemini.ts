@@ -34,6 +34,21 @@ async function fetchAsInlineData(url: string): Promise<InlinePart> {
   return { inlineData: { mimeType, data: buf.toString("base64") } };
 }
 
+/** Maps raw Gemini errors to a short, user-facing message. */
+export function friendlyAiError(e: unknown): string {
+  const msg = e instanceof Error ? e.message : String(e);
+  if (/RESOURCE_EXHAUSTED|quota|\b429\b/i.test(msg)) {
+    return "Image generation is over quota — the Gemini image model has no free-tier quota. Enable billing on the API key's Google Cloud project.";
+  }
+  if (/API[_ ]?key|PERMISSION_DENIED|UNAUTHENT|\b401\b|\b403\b/i.test(msg)) {
+    return "Gemini API key is missing or unauthorized for this project.";
+  }
+  if (/NOT_FOUND|\b404\b/i.test(msg)) {
+    return "Gemini model not available for this key/project.";
+  }
+  return msg;
+}
+
 const DESIGN_SYSTEM =
   "Generate a clothing graphic suitable for direct-to-garment printing. " +
   "Solid or transparent background. High contrast. No text unless explicitly requested. " +

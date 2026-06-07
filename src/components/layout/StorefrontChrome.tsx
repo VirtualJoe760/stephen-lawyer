@@ -21,7 +21,16 @@ export function StorefrontChrome({
   children: ReactNode;
 }) {
   const pathname = usePathname();
-  if (pathname?.startsWith("/admin")) return <>{children}</>;
+  // Admin keeps its own full-screen chrome, but the app-style bottom bar is
+  // site-wide (including the design tool).
+  if (pathname?.startsWith("/admin")) {
+    return (
+      <>
+        {children}
+        <MobileTabBar />
+      </>
+    );
+  }
   return (
     <>
       {ticker}

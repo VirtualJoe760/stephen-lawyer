@@ -2,7 +2,7 @@ import { db } from "@/lib/db";
 import { compositions, designs } from "@/db/schema";
 import { requireAdminRoute } from "@/lib/admin/auth";
 import { getBlank } from "@/lib/printful/catalog";
-import { composeOnGarment } from "@/lib/gemini";
+import { composeOnGarment, friendlyAiError } from "@/lib/gemini";
 import { uploadImage } from "@/lib/cloudinary";
 import { eq } from "drizzle-orm";
 
@@ -15,6 +15,7 @@ export async function POST(req: Request) {
     designId?: string;
     templateKey?: string;
     placement?: string;
+    mockupUrl?: string;
     x?: number;
     y?: number;
   } | null;
@@ -43,14 +44,21 @@ export async function POST(req: Request) {
 
   // Review-only composite: design graphic rendered on the garment photo.
   try {
-    if (!blank.image) {
+    // Use the chosen color's mockup if the canvas sent one (validated as a
+    // Printful CDN URL), else the blank's default image.
+    const override =
+      typeof body?.mockupUrl === "string" && body.mockupUrl.startsWith("https://files.cdn.printful.com")
+        ? body.mockupUrl
+        : null;
+    const mockup = override || blank.image;
+    if (!mockup) {
       throw new Error("No mockup image available for this blank");
     }
     const instruction =
       `Place the provided graphic naturally on the ${placement.replace(/_/g, " ")} of the ${blank.name}. ` +
       "Realistic fabric drape, soft studio lighting, neutral background. " +
       "The graphic must remain clearly readable and not distort.";
-    const png = await composeOnGarment(design.url, blank.image, instruction);
+    const png = await composeOnGarment(design.url, mockup, instruction);
     const uploaded = await uploadImage(png, { folder: `stephen-lawyer/compositions/${comp.id}` });
     const [updated] = await db
       .update(compositions)
@@ -59,7 +67,7 @@ export async function POST(req: Request) {
       .returning();
     return Response.json({ composition: updated }, { status: 201 });
   } catch (e) {
-    const msg = e instanceof Error ? e.message : String(e);
+    const msg = friendlyAiError(e);
     const [failed] = await db
       .update(compositions)
       .set({ status: "failed", errorMessage: msg })

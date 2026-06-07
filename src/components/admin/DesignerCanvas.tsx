@@ -200,7 +200,7 @@ function DesignerInner({ catalogue, catalogues, initialNodes, designs, blanks }:
   );
 
   const createComposition = useCallback(
-    async (designId: string, productId: string, position: { x: number; y: number }) => {
+    async (designId: string, productId: string, mockupUrl: string, position: { x: number; y: number }) => {
       if (!designId || !productId) return;
       const tempId = crypto.randomUUID();
       const skeleton: Node = {
@@ -218,6 +218,7 @@ function DesignerInner({ catalogue, catalogues, initialNodes, designs, blanks }:
             catalogueId: catalogue.id,
             designId,
             templateKey: productId,
+            mockupUrl,
             x: Math.round(position.x),
             y: Math.round(position.y),
           }),
@@ -254,10 +255,12 @@ function DesignerInner({ catalogue, catalogues, initialNodes, designs, blanks }:
       const dBox = boxOf(dragged);
       const tpl = all.find((n) => n.type === "template" && overlaps(dBox, boxOf(n)));
       if (tpl) {
-        createComposition(str(dragged.data, "designId"), str(tpl.data, "productId"), {
-          x: dragged.position.x + 70,
-          y: dragged.position.y + 70,
-        });
+        createComposition(
+          str(dragged.data, "designId"),
+          str(tpl.data, "productId"),
+          str(tpl.data, "image"),
+          { x: dragged.position.x + 70, y: dragged.position.y + 70 },
+        );
       }
     },
     [rf, createComposition],
@@ -307,7 +310,7 @@ function DesignerInner({ catalogue, catalogues, initialNodes, designs, blanks }:
   );
 
   return (
-    <div className="flex h-[100dvh] flex-col bg-ink text-bone">
+    <div className="flex h-[100dvh] flex-col bg-ink text-bone pb-14 lg:pb-0">
       <header className="flex items-center gap-3 border-b border-bone/10 px-3 py-2">
         <Link
           href="/admin"
@@ -357,8 +360,8 @@ function DesignerInner({ catalogue, catalogues, initialNodes, designs, blanks }:
         </aside>
       </div>
 
-      {/* Mobile templates dock */}
-      <div className="max-h-44 overflow-y-auto border-t border-bone/10 p-2 lg:hidden">
+      {/* Mobile templates dock (horizontal scroll only) */}
+      <div className="border-t border-bone/10 p-2 lg:hidden">
         <TemplatesRail blanks={blanks} onAdd={addTemplate} orientation="horizontal" />
       </div>
 

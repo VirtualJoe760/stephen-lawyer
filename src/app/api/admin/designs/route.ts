@@ -2,7 +2,7 @@ import { db } from "@/lib/db";
 import { designs, catalogues } from "@/db/schema";
 import { requireAdminRoute } from "@/lib/admin/auth";
 import { auth } from "@/lib/auth";
-import { generateDesign } from "@/lib/gemini";
+import { generateDesign, friendlyAiError } from "@/lib/gemini";
 import { uploadImage, thumbUrl } from "@/lib/cloudinary";
 import { desc, eq } from "drizzle-orm";
 
@@ -39,10 +39,7 @@ export async function POST(req: Request) {
   try {
     png = await generateDesign(prompt);
   } catch (e) {
-    return Response.json(
-      { error: `Generation failed: ${e instanceof Error ? e.message : String(e)}` },
-      { status: 502 },
-    );
+    return Response.json({ error: friendlyAiError(e) }, { status: 502 });
   }
 
   let uploaded;

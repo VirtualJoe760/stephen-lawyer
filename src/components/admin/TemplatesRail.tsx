@@ -47,7 +47,9 @@ export function TemplatesRail({
   const cardCls = `shrink-0 rounded-md border border-bone/15 bg-ink-soft p-2 text-left transition-colors hover:border-hazard ${
     horizontal ? "w-28" : "w-full"
   }`;
-  const grid = horizontal ? "flex gap-2 overflow-x-auto pb-1" : "flex flex-col gap-2 overflow-y-auto";
+  const grid = horizontal
+    ? "flex gap-2 overflow-x-auto overflow-y-hidden pb-1"
+    : "flex flex-col gap-2 overflow-y-auto";
 
   return (
     <div className="flex h-full min-h-0 flex-col gap-2">

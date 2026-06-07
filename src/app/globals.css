@@ -107,3 +107,14 @@
 .prose-stephen a:hover {
   color: var(--color-hazard);
 }
+
+/* Prevent iOS Safari from auto-zooming when focusing an input.
+   iOS zooms only when the control's font-size is < 16px, so force 16px on
+   touch/small screens. (user-scalable=no is ignored by modern iOS.) */
+@media (max-width: 1023px) {
+  input,
+  textarea,
+  select {
+    font-size: 16px !important;
+  }
+}

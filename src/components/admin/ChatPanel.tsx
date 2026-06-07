@@ -70,7 +70,7 @@ export function ChatPanel({
     <>
       <button
         onClick={() => setOpen(true)}
-        className="fixed bottom-4 right-4 z-20 rounded-full bg-hazard px-4 py-3 text-xs font-bold uppercase tracking-widest text-bone shadow-lg lg:hidden"
+        className="fixed bottom-16 right-4 z-30 rounded-full bg-hazard px-4 py-3 text-xs font-bold uppercase tracking-widest text-bone shadow-lg lg:hidden"
       >
         Chat
       </button>
