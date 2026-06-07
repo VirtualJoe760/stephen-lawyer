@@ -47,8 +47,11 @@ export default async function DesignerCanvasPage({
         id: n.id,
         kind: n.kind,
         refId: n.refId,
+        groupId: n.groupId,
         x: n.x,
         y: n.y,
+        width: n.width,
+        height: n.height,
         scale: n.scale,
         zIndex: n.zIndex,
       }))}

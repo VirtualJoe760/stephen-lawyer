@@ -22,6 +22,13 @@
       "when": 1780862821080,
       "tag": "0002_magical_redwing",
       "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "7",
+      "when": 1780864550790,
+      "tag": "0003_serious_lorna_dane",
+      "breakpoints": true
     }
   ]
 }

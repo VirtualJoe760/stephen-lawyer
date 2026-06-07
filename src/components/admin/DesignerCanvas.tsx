@@ -19,6 +19,7 @@ import { TemplateNode } from "./nodes/TemplateNode";
 import { DesignNode } from "./nodes/DesignNode";
 import { CompositionNode } from "./nodes/CompositionNode";
 import { LabelNode } from "./nodes/LabelNode";
+import { GroupNode } from "./nodes/GroupNode";
 import { TemplatesRail } from "./TemplatesRail";
 import { DesignsHistoryBar } from "./DesignsHistoryBar";
 import { ChatPanel, type DesignOptions } from "./ChatPanel";
@@ -33,8 +34,11 @@ export interface CanvasNodeRow {
   id: string;
   kind: string;
   refId: string;
+  groupId?: string | null;
   x: number;
   y: number;
+  width?: number | null;
+  height?: number | null;
   scale: number;
   zIndex: number;
 }
@@ -70,7 +74,31 @@ const nodeTypes: NodeTypes = {
   design: DesignNode,
   composition: CompositionNode,
   label: LabelNode,
+  group: GroupNode,
 };
+
+const GROUP_PAD = 16;
+
+// Bounding box (with padding) around a set of member nodes, in flow coords.
+function groupBoxOf(members: Node[], pad = GROUP_PAD) {
+  const boxes = members.map(boxOf);
+  const minX = Math.min(...boxes.map((b) => b.x));
+  const minY = Math.min(...boxes.map((b) => b.y));
+  const maxX = Math.max(...boxes.map((b) => b.x + b.w));
+  const maxY = Math.max(...boxes.map((b) => b.y + b.h));
+  return { x: minX - pad, y: minY - pad, width: maxX - minX + 2 * pad, height: maxY - minY + 2 * pad };
+}
+
+// Resize/reposition each group node to wrap its current members.
+function reflowGroups(nodes: Node[]): Node[] {
+  return nodes.map((n) => {
+    if (n.type !== "group") return n;
+    const members = nodes.filter((m) => m.type !== "group" && str(m.data, "groupId") === n.id);
+    if (!members.length) return n;
+    const b = groupBoxOf(members);
+    return { ...n, position: { x: b.x, y: b.y }, width: b.width, height: b.height };
+  });
+}
 
 const SIZES = {
   template: { width: 130, height: 165 },
@@ -105,14 +133,30 @@ function rowToFlowNode(
   compositionsById: Map<string, CompositionRow>,
 ): Node {
   const position = { x: r.x, y: r.y };
+  const sizeOverride = r.width && r.height ? { width: r.width, height: r.height } : null;
+  const gid = r.groupId ?? undefined;
+  if (r.kind === "group") {
+    return {
+      id: r.id,
+      type: "group",
+      position,
+      width: r.width ?? 200,
+      height: r.height ?? 200,
+      data: { name: r.refId, groupId: r.id },
+      dragHandle: ".group-handle",
+      selectable: false,
+      zIndex: 0,
+    };
+  }
   if (r.kind === "design") {
     const d = designs.find((x) => x.id === r.refId);
     return {
       id: r.id,
       type: "design",
       position,
-      ...SIZES.design,
-      data: { designId: r.refId, thumbUrl: d?.thumbUrl, prompt: d?.prompt },
+      ...(sizeOverride ?? SIZES.design),
+      zIndex: 1,
+      data: { designId: r.refId, thumbUrl: d?.thumbUrl, prompt: d?.prompt, groupId: gid },
     };
   }
   if (r.kind === "composition") {
@@ -121,20 +165,22 @@ function rowToFlowNode(
       id: r.id,
       type: "composition",
       position,
-      ...SIZES.composition,
-      data: { compositionId: r.refId, status: c?.status ?? "draft", previewUrl: c?.previewUrl ?? null },
+      ...(sizeOverride ?? SIZES.composition),
+      zIndex: 1,
+      data: { compositionId: r.refId, status: c?.status ?? "draft", previewUrl: c?.previewUrl ?? null, groupId: gid },
     };
   }
   if (r.kind === "label") {
-    return { id: r.id, type: "label", position, data: { text: r.refId } };
+    return { id: r.id, type: "label", position, zIndex: 1, data: { text: r.refId } };
   }
   const b = blanksById.get(r.refId);
   return {
     id: r.id,
     type: "template",
     position,
-    ...SIZES.template,
-    data: { productId: r.refId, name: b?.name, image: b?.image },
+    ...(sizeOverride ?? SIZES.template),
+    zIndex: 1,
+    data: { productId: r.refId, name: b?.name, image: b?.image, groupId: gid },
   };
 }
 
@@ -147,15 +193,22 @@ function flowNodeToRow(n: Node): CanvasNodeRow {
         ? str(n.data, "compositionId")
         : kind === "label"
           ? str(n.data, "text")
-          : str(n.data, "productId");
+          : kind === "group"
+            ? str(n.data, "name")
+            : str(n.data, "productId");
+  const w = n.width ?? n.measured?.width ?? null;
+  const h = n.height ?? n.measured?.height ?? null;
   return {
     id: n.id,
     kind,
     refId,
+    groupId: kind === "group" ? null : str(n.data, "groupId") || null,
     x: Math.round(n.position.x),
     y: Math.round(n.position.y),
+    width: w ? Math.round(w) : null,
+    height: h ? Math.round(h) : null,
     scale: 100,
-    zIndex: 0,
+    zIndex: kind === "group" ? 0 : 1,
   };
 }
 
@@ -242,7 +295,19 @@ function DesignerInner({ catalogue, catalogues, initialNodes, designs, compositi
   const onNodesChange = useCallback(
     (changes: NodeChange[]) => {
       setNodes((cur) => {
-        const next = applyNodeChanges(changes, cur);
+        // Removing a group node un-groups its members (they stay on the canvas).
+        const removedGroupIds = changes
+          .filter((c) => c.type === "remove")
+          .map((c) => (c as { id: string }).id)
+          .filter((id) => cur.find((n) => n.id === id && n.type === "group"));
+        let next = applyNodeChanges(changes, cur);
+        if (removedGroupIds.length) {
+          next = next.map((n) =>
+            removedGroupIds.includes(str(n.data, "groupId"))
+              ? { ...n, data: { ...n.data, groupId: undefined } }
+              : n,
+          );
+        }
         if (changes.some((c) => c.type === "position" || c.type === "remove" || c.type === "dimensions"))
           persist(next);
         return next;
@@ -250,6 +315,32 @@ function DesignerInner({ catalogue, catalogues, initialNodes, designs, compositi
     },
     [persist],
   );
+
+  // Dragging a group's header moves all its members together.
+  const groupDrag = useRef<{ id: string; sx: number; sy: number; members: Map<string, { x: number; y: number }> } | null>(null);
+  const onNodeDragStart = useCallback(
+    (_e: unknown, node: Node) => {
+      if (node.type !== "group") return;
+      const members = new Map<string, { x: number; y: number }>();
+      for (const n of rf.getNodes()) {
+        if (str(n.data, "groupId") === node.id) members.set(n.id, { x: n.position.x, y: n.position.y });
+      }
+      groupDrag.current = { id: node.id, sx: node.position.x, sy: node.position.y, members };
+    },
+    [rf],
+  );
+  const onNodeDrag = useCallback((_e: unknown, node: Node) => {
+    const g = groupDrag.current;
+    if (!g || node.id !== g.id) return;
+    const dx = node.position.x - g.sx;
+    const dy = node.position.y - g.sy;
+    setNodes((cur) =>
+      cur.map((n) => {
+        const s = g.members.get(n.id);
+        return s ? { ...n, position: { x: s.x + dx, y: s.y + dy } } : n;
+      }),
+    );
+  }, []);
 
   // Combine a design + product → a horizontal group (design, product, composite)
   // with an editable group-name label above.
@@ -262,26 +353,43 @@ function DesignerInner({ catalogue, catalogues, initialNodes, designs, compositi
       const gy = template.position.y;
       const compositePos = { x: gx + 2 * COL, y: gy };
       const tempId = crypto.randomUUID();
-      const nameId = crypto.randomUUID();
-      const groupNum = nodes.filter((n) => n.type === "label").length + 1;
+      const groupId = crypto.randomUUID();
+      const groupNum = nodes.filter((n) => n.type === "group").length + 1;
 
       setNodes((cur) => {
-        const next = cur
+        const members = cur
           .map((n) => {
-            if (n.id === design.nodeId) return { ...n, position: { x: gx, y: gy } };
-            if (n.id === template.nodeId) return { ...n, position: { x: gx + COL, y: gy } };
+            if (n.id === design.nodeId)
+              return { ...n, position: { x: gx, y: gy }, zIndex: 1, data: { ...n.data, groupId } };
+            if (n.id === template.nodeId)
+              return { ...n, position: { x: gx + COL, y: gy }, zIndex: 1, data: { ...n.data, groupId } };
             return n;
           })
           .concat([
-            { id: nameId, type: "label", position: { x: gx, y: gy - 30 }, data: { text: `Group ${groupNum}` } },
             {
               id: tempId,
               type: "composition",
               position: compositePos,
               ...SIZES.composition,
-              data: { compositionId: "", status: "generating" },
+              zIndex: 1,
+              data: { compositionId: "", status: "generating", groupId },
             },
           ]);
+        // Group container wrapping the three members.
+        const groupMembers = members.filter((n) => str(n.data, "groupId") === groupId);
+        const box = groupBoxOf(groupMembers);
+        const groupNode: Node = {
+          id: groupId,
+          type: "group",
+          position: { x: box.x, y: box.y },
+          width: box.width,
+          height: box.height,
+          data: { name: `Group ${groupNum}`, groupId },
+          dragHandle: ".group-handle",
+          selectable: false,
+          zIndex: 0,
+        };
+        const next = [groupNode, ...members];
         persist(next);
         return next;
       });
@@ -309,7 +417,7 @@ function DesignerInner({ catalogue, catalogues, initialNodes, designs, compositi
         setNodes((cur) => {
           const next = cur.map((n) =>
             n.id === tempId
-              ? { ...n, data: { compositionId: comp.id, status: comp.status, previewUrl: comp.previewUrl } }
+              ? { ...n, data: { ...n.data, compositionId: comp.id, status: comp.status, previewUrl: comp.previewUrl } }
               : n,
           );
           persist(next);
@@ -317,7 +425,7 @@ function DesignerInner({ catalogue, catalogues, initialNodes, designs, compositi
         });
       } catch (e) {
         setNodes((cur) =>
-          cur.map((n) => (n.id === tempId ? { ...n, data: { compositionId: "", status: "failed" } } : n)),
+          cur.map((n) => (n.id === tempId ? { ...n, data: { ...n.data, compositionId: "", status: "failed" } } : n)),
         );
         if (typeof window !== "undefined") window.alert(e instanceof Error ? e.message : "Composition failed");
       }
@@ -327,36 +435,48 @@ function DesignerInner({ catalogue, catalogues, initialNodes, designs, compositi
 
   // Drag a design onto a template → placement modal (where/all-over).
   // Drag a design onto another design → merge modal (collision prompt).
+  // Any other drag → reflow group boxes to fit their members.
+  const reflowAndPersist = useCallback(() => {
+    setNodes((cur) => {
+      const next = reflowGroups(cur);
+      persist(next);
+      return next;
+    });
+  }, [persist]);
+
   const onNodeDragStop = useCallback(
     (_e: unknown, dragged: Node) => {
-      if (dragged.type !== "design") return;
-      const all = rf.getNodes();
-      const dBox = boxOf(dragged);
-      const tpl = all.find((n) => n.type === "template" && overlaps(dBox, boxOf(n)));
-      if (tpl) {
-        setCombineTarget({
-          design: { designId: str(dragged.data, "designId"), nodeId: dragged.id },
-          template: {
-            productId: str(tpl.data, "productId"),
-            name: str(tpl.data, "name"),
-            image: str(tpl.data, "image"),
-            nodeId: tpl.id,
-            position: { x: tpl.position.x, y: tpl.position.y },
-          },
-        });
-        return;
+      const wasGroup = groupDrag.current?.id === dragged.id;
+      groupDrag.current = null;
+      if (!wasGroup && dragged.type === "design") {
+        const all = rf.getNodes();
+        const dBox = boxOf(dragged);
+        const tpl = all.find((n) => n.type === "template" && overlaps(dBox, boxOf(n)));
+        if (tpl) {
+          setCombineTarget({
+            design: { designId: str(dragged.data, "designId"), nodeId: dragged.id },
+            template: {
+              productId: str(tpl.data, "productId"),
+              name: str(tpl.data, "name"),
+              image: str(tpl.data, "image"),
+              nodeId: tpl.id,
+              position: { x: tpl.position.x, y: tpl.position.y },
+            },
+          });
+          return;
+        }
+        const other = all.find((n) => n.type === "design" && n.id !== dragged.id && overlaps(dBox, boxOf(n)));
+        if (other) {
+          setMergeTarget({
+            a: { designId: str(dragged.data, "designId"), thumbUrl: str(dragged.data, "thumbUrl") || undefined },
+            b: { designId: str(other.data, "designId"), thumbUrl: str(other.data, "thumbUrl") || undefined },
+          });
+          return;
+        }
       }
-      const other = all.find(
-        (n) => n.type === "design" && n.id !== dragged.id && overlaps(dBox, boxOf(n)),
-      );
-      if (other) {
-        setMergeTarget({
-          a: { designId: str(dragged.data, "designId"), thumbUrl: str(dragged.data, "thumbUrl") || undefined },
-          b: { designId: str(other.data, "designId"), thumbUrl: str(other.data, "thumbUrl") || undefined },
-        });
-      }
+      reflowAndPersist();
     },
-    [rf],
+    [rf, reflowAndPersist],
   );
 
   const onNodeClick = useCallback(
@@ -547,6 +667,8 @@ function DesignerInner({ catalogue, catalogues, initialNodes, designs, compositi
           <ReactFlow
             nodes={nodes}
             onNodesChange={onNodesChange}
+            onNodeDragStart={onNodeDragStart}
+            onNodeDrag={onNodeDrag}
             onNodeDragStop={onNodeDragStop}
             onNodeClick={onNodeClick}
             nodeTypes={nodeTypes}

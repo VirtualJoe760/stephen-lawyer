@@ -286,10 +286,13 @@ export const canvasNodes = pgTable(
     catalogueId: uuid("catalogue_id")
       .notNull()
       .references(() => catalogues.id, { onDelete: "cascade" }),
-    kind: text("kind").notNull(), // "template" | "design" | "composition"
-    refId: text("ref_id").notNull(), // designId / compositionId / templateKey
+    kind: text("kind").notNull(), // "template" | "design" | "composition" | "label" | "group"
+    refId: text("ref_id").notNull(), // designId / compositionId / templateKey / text / group name
+    groupId: text("group_id"), // members of a group share the group node's id
     x: integer("x").notNull().default(0),
     y: integer("y").notNull().default(0),
+    width: integer("width"), // persisted size (resize + group box)
+    height: integer("height"),
     scale: integer("scale").notNull().default(100), // percent
     zIndex: integer("z_index").notNull().default(0),
     updatedAt: timestamp("updated_at")

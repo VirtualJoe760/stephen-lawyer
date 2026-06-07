@@ -26,11 +26,16 @@ interface IncomingNode {
   id?: string;
   kind?: string;
   refId?: string;
+  groupId?: string | null;
   x?: number;
   y?: number;
+  width?: number | null;
+  height?: number | null;
   scale?: number;
   zIndex?: number;
 }
+
+const num = (v: unknown): number | null => (typeof v === "number" && Number.isFinite(v) ? Math.round(v) : null);
 
 // Replace-all: simplest idempotent persistence for a single-admin canvas.
 export async function PUT(req: Request, { params }: Ctx) {
@@ -63,8 +68,11 @@ export async function PUT(req: Request, { params }: Ctx) {
       catalogueId: cat.id,
       kind: String(n.kind),
       refId: String(n.refId),
+      groupId: typeof n.groupId === "string" && n.groupId.length === 36 ? n.groupId : null,
       x: Math.round(Number(n.x) || 0),
       y: Math.round(Number(n.y) || 0),
+      width: num(n.width),
+      height: num(n.height),
       scale: Math.round(Number(n.scale) || 100),
       zIndex: Math.round(Number(n.zIndex) || 0),
     }));
