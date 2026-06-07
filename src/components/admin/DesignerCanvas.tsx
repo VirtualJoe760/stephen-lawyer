@@ -282,7 +282,7 @@ function DesignerInner({ catalogue, catalogues, initialNodes, designs, blanks }:
     [catalogue.id, persist],
   );
 
-  // Drag a design onto a template → quick composite (front placement).
+  // Drag a design onto a template → open the placement modal (where/all-over).
   const onNodeDragStop = useCallback(
     (_e: unknown, dragged: Node) => {
       if (dragged.type !== "design") return;
@@ -290,13 +290,18 @@ function DesignerInner({ catalogue, catalogues, initialNodes, designs, blanks }:
       const dBox = boxOf(dragged);
       const tpl = all.find((n) => n.type === "template" && overlaps(dBox, boxOf(n)));
       if (tpl) {
-        createComposition(str(dragged.data, "designId"), str(tpl.data, "productId"), str(tpl.data, "image"), "front", {
-          x: dragged.position.x + 70,
-          y: dragged.position.y + 70,
+        setCombineTarget({
+          design: { designId: str(dragged.data, "designId") },
+          template: {
+            productId: str(tpl.data, "productId"),
+            name: str(tpl.data, "name"),
+            image: str(tpl.data, "image"),
+            position: { x: tpl.position.x + 70, y: tpl.position.y + 70 },
+          },
         });
       }
     },
-    [rf, createComposition],
+    [rf],
   );
 
   const onNodeClick = useCallback((_e: unknown, node: Node) => {
