@@ -1,5 +1,5 @@
 import { db } from "@/lib/db";
-import { compositions } from "@/db/schema";
+import { compositions, designs } from "@/db/schema";
 import { requireAdminRoute } from "@/lib/admin/auth";
 import { eq } from "drizzle-orm";
 
@@ -13,7 +13,12 @@ export async function GET(_req: Request, { params }: Ctx) {
   const { id } = await params;
   const [c] = await db.select().from(compositions).where(eq(compositions.id, id)).limit(1);
   if (!c) return Response.json({ error: "Not found" }, { status: 404 });
-  return Response.json({ composition: c });
+  const [d] = await db
+    .select({ url: designs.url, thumbUrl: designs.thumbUrl })
+    .from(designs)
+    .where(eq(designs.id, c.designId))
+    .limit(1);
+  return Response.json({ composition: { ...c, designUrl: d?.url, designThumbUrl: d?.thumbUrl } });
 }
 
 export async function PATCH(req: Request, { params }: Ctx) {

@@ -257,6 +257,15 @@ export const compositions = pgTable(
       .references(() => designs.id, { onDelete: "cascade" }),
     templateKey: text("template_key").notNull(),
     placement: text("placement").notNull().default("front"),
+    // Design rectangle within the print area, in print-file pixels. Null = Printful default fit.
+    position: jsonb("position").$type<{
+      areaWidth: number;
+      areaHeight: number;
+      width: number;
+      height: number;
+      top: number;
+      left: number;
+    }>(),
     previewUrl: text("preview_url"),
     status: compositionStatus("status").notNull().default("generating"),
     printfulSyncProductId: text("printful_sync_product_id"),

@@ -1,12 +1,17 @@
 "use client";
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
+import { PlacementEditor, type InitialPosition } from "./PlacementEditor";
 
 interface Comp {
   id: string;
   previewUrl: string | null;
   status: string;
   errorMessage: string | null;
+  templateKey: string;
+  placement: string;
+  position: InitialPosition | null;
+  designUrl?: string;
 }
 
 export function CompositionModal({
@@ -21,6 +26,10 @@ export function CompositionModal({
   const router = useRouter();
   const [comp, setComp] = useState<Comp | null>(null);
   const [busy, setBusy] = useState(false);
+  const [editorOpen, setEditorOpen] = useState(false);
+
+  const productId = comp ? Number(comp.templateKey) : NaN;
+  const canEdit = Number.isFinite(productId) && !!comp?.designUrl;
 
   useEffect(() => {
     let active = true;
@@ -72,6 +81,14 @@ export function CompositionModal({
         </div>
         <div className="flex gap-2 border-t border-bone/10 p-3">
           <button
+            disabled={!canEdit}
+            onClick={() => setEditorOpen(true)}
+            title={canEdit ? "Resize and position the design on the product" : "Only catalog-product composites can be adjusted"}
+            className="rounded border border-bone/20 px-3 py-2 text-xs font-bold uppercase tracking-widest text-bone/70 hover:border-hazard hover:text-bone disabled:opacity-40"
+          >
+            Adjust size &amp; placement
+          </button>
+          <button
             disabled={busy || !comp?.previewUrl}
             onClick={() => router.push(`/admin/compositions/${compositionId}/finalize`)}
             className="flex-1 rounded bg-hazard px-3 py-2 text-xs font-bold uppercase tracking-widest text-bone disabled:opacity-50"
@@ -87,6 +104,18 @@ export function CompositionModal({
           </button>
         </div>
       </div>
+
+      {editorOpen && comp && canEdit ? (
+        <PlacementEditor
+          compositionId={comp.id}
+          productId={productId}
+          designUrl={comp.designUrl!}
+          initialPlacement={comp.placement}
+          initialPosition={comp.position}
+          onSaved={(mockupUrl) => setComp((c) => (c ? { ...c, previewUrl: mockupUrl, status: "draft" } : c))}
+          onClose={() => setEditorOpen(false)}
+        />
+      ) : null}
     </div>
   );
 }

@@ -174,12 +174,22 @@ export async function getOrder(id: string | number): Promise<PrintfulOrder> {
 
 // ---------- Sync product creation (admin design generator) ----------
 
+// Design rectangle within a print area, in print-file pixels.
+export interface MockupPosition {
+  area_width: number;
+  area_height: number;
+  width: number;
+  height: number;
+  top: number;
+  left: number;
+}
+
 export interface CreateSyncProductInput {
   sync_product: { name: string; thumbnail?: string };
   sync_variants: Array<{
     variant_id: number; // Printful catalog variant id
     retail_price: string; // "29.99"
-    files: Array<{ type: string; url: string }>;
+    files: Array<{ type: string; url: string; position?: MockupPosition }>;
   }>;
 }
 
@@ -236,6 +246,93 @@ export async function getProductPlacements(productId: number): Promise<ProductPl
   const available = r.available_placements ?? {};
   const allOver = Object.keys(available).some((k) => /dtfabric|all[_-]?over/i.test(k));
   return { available, allOver };
+}
+
+// ---------- Print areas + mockup generator (placement editor) ----------
+
+export interface PrintAreaPlacement {
+  placement: string; // "front", "back", "sleeve_left", ...
+  printfileId: number;
+  areaWidth: number; // print-file px (the position coordinate space)
+  areaHeight: number;
+}
+
+// GET /mockup-generator/printfiles/{id} → per-placement print-area dimensions,
+// plus a representative variant id to render mockups with.
+export async function getProductPrintfiles(
+  productId: number,
+): Promise<{ variantId: number | null; placements: PrintAreaPlacement[] }> {
+  const r = await request<{
+    available_placements?: Record<string, string>;
+    printfiles?: Array<{ printfile_id: number; width: number; height: number }>;
+    variant_printfiles?: Array<{ variant_id: number; placements: Record<string, number> }>;
+  }>(`/mockup-generator/printfiles/${productId}`);
+
+  const byId = new Map((r.printfiles ?? []).map((p) => [p.printfile_id, p]));
+  const vp = r.variant_printfiles?.[0];
+  const placements: PrintAreaPlacement[] = [];
+  if (vp) {
+    for (const [placement, printfileId] of Object.entries(vp.placements)) {
+      const pf = byId.get(printfileId);
+      if (pf) placements.push({ placement, printfileId, areaWidth: pf.width, areaHeight: pf.height });
+    }
+  }
+  return { variantId: vp?.variant_id ?? null, placements };
+}
+
+export interface MockupFile {
+  placement: string;
+  image_url: string;
+  position?: MockupPosition;
+}
+
+// POST /mockup-generator/create-task/{id} → async mockup render task.
+export async function createMockupTask(
+  productId: number,
+  input: { variant_ids: number[]; format?: "jpg" | "png"; files: MockupFile[] },
+): Promise<string> {
+  const r = await request<{ task_key: string }>(`/mockup-generator/create-task/${productId}`, {
+    method: "POST",
+    body: { format: "jpg", ...input },
+  });
+  return r.task_key;
+}
+
+export interface MockupTaskResult {
+  status: "pending" | "completed" | "failed";
+  mockups: Array<{ placement: string; mockup_url: string; variant_ids: number[] }>;
+  error?: string;
+}
+
+// GET /mockup-generator/task?task_key=... → poll a render task.
+export async function getMockupTask(taskKey: string): Promise<MockupTaskResult> {
+  const r = await request<{
+    status: MockupTaskResult["status"];
+    mockups?: MockupTaskResult["mockups"];
+    error?: string;
+  }>("/mockup-generator/task", { query: { task_key: taskKey } });
+  return { status: r.status, mockups: r.mockups ?? [], error: r.error };
+}
+
+// Convenience: create a single-placement mockup and poll until done.
+export async function renderMockup(
+  productId: number,
+  variantId: number,
+  file: MockupFile,
+  { attempts = 20, intervalMs = 1500 }: { attempts?: number; intervalMs?: number } = {},
+): Promise<string> {
+  const key = await createMockupTask(productId, { variant_ids: [variantId], files: [file] });
+  for (let i = 0; i < attempts; i++) {
+    const res = await getMockupTask(key);
+    if (res.status === "completed") {
+      const url = res.mockups[0]?.mockup_url;
+      if (!url) throw new Error("Mockup completed but returned no image");
+      return url;
+    }
+    if (res.status === "failed") throw new Error(res.error || "Mockup task failed");
+    await new Promise((s) => setTimeout(s, intervalMs));
+  }
+  throw new Error("Mockup task timed out");
 }
 
 // GET /products/{id} → catalog product + its variants.

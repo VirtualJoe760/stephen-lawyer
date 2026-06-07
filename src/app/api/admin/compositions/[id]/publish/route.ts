@@ -43,6 +43,19 @@ export async function POST(req: Request, { params }: Ctx) {
   // Print file = raw design PNG, upscaled. NOT the review composite.
   const printUrl = upscaleForPrint(design.cloudinaryPublicId);
 
+  // If the operator set an explicit size/placement, send it so production
+  // matches the preview. Otherwise Printful auto-fits (centered).
+  const position = comp.position
+    ? {
+        area_width: comp.position.areaWidth,
+        area_height: comp.position.areaHeight,
+        width: comp.position.width,
+        height: comp.position.height,
+        top: comp.position.top,
+        left: comp.position.left,
+      }
+    : undefined;
+
   let syncProductId = "";
   try {
     const synced = await createSyncProduct(
@@ -51,7 +64,7 @@ export async function POST(req: Request, { params }: Ctx) {
         sync_variants: variants.map((v) => ({
           variant_id: v.printfulVariantId,
           retail_price: (v.retailPriceCents / 100).toFixed(2),
-          files: [{ type: placement, url: printUrl }],
+          files: [{ type: placement, url: printUrl, ...(position ? { position } : {}) }],
         })),
       },
       comp.id, // idempotency key
