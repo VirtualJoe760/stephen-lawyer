@@ -3,7 +3,7 @@ import Stripe from "stripe";
 const key = process.env.STRIPE_SECRET_KEY;
 
 export const stripe = key
-  ? new Stripe(key, { apiVersion: "2024-11-20.acacia" })
+  ? new Stripe(key, { apiVersion: "2025-02-24.acacia" })
   : (new Proxy(
       {},
       {
