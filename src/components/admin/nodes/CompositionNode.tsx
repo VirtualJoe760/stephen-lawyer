@@ -6,7 +6,6 @@ export type CompositionNodeData = {
   compositionId: string;
   status: "generating" | "draft" | "approved" | "published" | "failed";
   previewUrl?: string | null;
-  onOpen?: (id: string) => void;
 };
 
 export const CompositionNode = memo(function CompositionNode({ data, selected }: NodeProps) {
@@ -15,10 +14,9 @@ export const CompositionNode = memo(function CompositionNode({ data, selected }:
   const failed = c.status === "failed";
   return (
     <div
-      className={`w-48 select-none rounded-md border bg-ink-soft p-2 text-bone shadow-lg ${
+      className={`w-48 cursor-pointer select-none rounded-md border bg-ink-soft p-2 text-bone shadow-lg ${
         selected ? "border-hazard" : "border-bone/20"
       }`}
-      onDoubleClick={() => c.onOpen?.(c.compositionId)}
     >
       <div className="relative aspect-square overflow-hidden rounded bg-bone/5">
         {c.previewUrl && !generating ? (
@@ -31,7 +29,9 @@ export const CompositionNode = memo(function CompositionNode({ data, selected }:
         )}
         {generating ? <div className="absolute inset-0 animate-pulse bg-bone/5" /> : null}
       </div>
-      <p className="mt-1 text-[10px] font-mono uppercase tracking-widest text-bone/50">{c.status}</p>
+      <p className="mt-1 text-[10px] font-mono uppercase tracking-widest text-bone/50">
+        {c.status} · tap to open
+      </p>
     </div>
   );
 });
