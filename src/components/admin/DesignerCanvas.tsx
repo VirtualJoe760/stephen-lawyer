@@ -26,6 +26,8 @@ import { CatalogueSwitcher } from "./CatalogueSwitcher";
 import { CompositionModal } from "./CompositionModal";
 import { DesignerToolbar, type ToolMode } from "./DesignerToolbar";
 import { CombineDialog, type CombineTarget } from "./CombineDialog";
+import { MergeDialog, type MergeTarget } from "./MergeDialog";
+import { DesignPreviewModal } from "./DesignPreviewModal";
 
 export interface CanvasNodeRow {
   id: string;
@@ -159,6 +161,8 @@ function DesignerInner({ catalogue, catalogues, initialNodes, designs, blanks }:
   const [modalCompId, setModalCompId] = useState<string | null>(null);
   const [toolMode, setToolMode] = useState<ToolMode>("select");
   const [combineTarget, setCombineTarget] = useState<CombineTarget | null>(null);
+  const [mergeTarget, setMergeTarget] = useState<MergeTarget | null>(null);
+  const [previewDesign, setPreviewDesign] = useState<DesignRow | null>(null);
   const saveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const persist = useCallback(
@@ -334,12 +338,22 @@ function DesignerInner({ catalogue, catalogues, initialNodes, designs, blanks }:
     [rf],
   );
 
-  const onNodeClick = useCallback((_e: unknown, node: Node) => {
-    if (node.type === "composition") {
-      const compId = str(node.data, "compositionId");
-      if (compId) setModalCompId(compId);
-    }
-  }, []);
+  const onNodeClick = useCallback(
+    (e: React.MouseEvent, node: Node) => {
+      if (node.type === "composition") {
+        const compId = str(node.data, "compositionId");
+        if (compId) setModalCompId(compId);
+        return;
+      }
+      // Plain click previews; modifier-click is reserved for multi-select (merge).
+      if (node.type === "design" && !e.ctrlKey && !e.metaKey && !e.shiftKey) {
+        const id = str(node.data, "designId");
+        const d = designList.find((x) => x.id === id);
+        if (d?.url) setPreviewDesign(d);
+      }
+    },
+    [designList],
+  );
 
   const onDiscarded = useCallback(
     (compId: string) => {
@@ -352,55 +366,115 @@ function DesignerInner({ catalogue, catalogues, initialNodes, designs, blanks }:
     [persist],
   );
 
-  // Toolbar "Combine": from the current selection, take a design + a template and
-  // open the placement dialog.
+  // Toolbar "Combine" — context-aware:
+  //  • a design + a template  → placement dialog → composite group
+  //  • two designs            → merge dialog → new merged design
   const onCombine = useCallback(() => {
     const sel = rf.getNodes().filter((n) => n.selected);
     const design = sel.find((n) => n.type === "design");
     const template = sel.find((n) => n.type === "template");
-    if (!design || !template) return;
-    setCombineTarget({
-      design: { designId: str(design.data, "designId"), nodeId: design.id },
-      template: {
-        productId: str(template.data, "productId"),
-        name: str(template.data, "name"),
-        image: str(template.data, "image"),
-        nodeId: template.id,
-        position: { x: template.position.x, y: template.position.y },
-      },
-    });
+    if (design && template) {
+      setCombineTarget({
+        design: { designId: str(design.data, "designId"), nodeId: design.id },
+        template: {
+          productId: str(template.data, "productId"),
+          name: str(template.data, "name"),
+          image: str(template.data, "image"),
+          nodeId: template.id,
+          position: { x: template.position.x, y: template.position.y },
+        },
+      });
+      return;
+    }
+    const designSel = sel.filter((n) => n.type === "design");
+    if (designSel.length >= 2) {
+      const [a, b] = designSel;
+      setMergeTarget({
+        a: { designId: str(a.data, "designId"), thumbUrl: str(a.data, "thumbUrl") || undefined },
+        b: { designId: str(b.data, "designId"), thumbUrl: str(b.data, "thumbUrl") || undefined },
+      });
+    }
   }, [rf]);
 
-  const canCombine = useMemo(
-    () =>
-      nodes.some((n) => n.selected && n.type === "design") &&
-      nodes.some((n) => n.selected && n.type === "template"),
-    [nodes],
-  );
+  const canCombine = useMemo(() => {
+    const sel = nodes.filter((n) => n.selected);
+    const hasDesign = sel.some((n) => n.type === "design");
+    const hasTemplate = sel.some((n) => n.type === "template");
+    const designCount = sel.filter((n) => n.type === "design").length;
+    return (hasDesign && hasTemplate) || designCount >= 2;
+  }, [nodes]);
+
+  // Shared: show a pending tile, run a request that returns { design }, then
+  // swap the tile for the real design (or drop it on failure).
+  const runDesignJob = useCallback(async (label: string, fetcher: () => Promise<Response>) => {
+    const tempId = crypto.randomUUID();
+    setDesignList((cur) => [{ id: tempId, thumbUrl: "", url: "", prompt: label, pending: true }, ...cur]);
+    try {
+      const res = await fetcher();
+      const data = (await res.json().catch(() => ({}))) as {
+        design?: { id: string; thumbUrl: string; url: string; prompt: string };
+        error?: string;
+      };
+      if (!res.ok || !data.design) throw new Error(data.error ?? "Failed");
+      const real = data.design;
+      setDesignList((cur) => cur.map((d) => (d.id === tempId ? { ...real } : d)));
+    } catch (e) {
+      setDesignList((cur) => cur.filter((d) => d.id !== tempId));
+      if (typeof window !== "undefined") window.alert(e instanceof Error ? e.message : "Failed");
+    }
+  }, []);
 
   const onPrompt = useCallback(
-    async (prompt: string) => {
-      const tempId = crypto.randomUUID();
-      setDesignList((cur) => [{ id: tempId, thumbUrl: "", url: "", prompt, pending: true }, ...cur]);
-      try {
-        const res = await fetch("/api/admin/designs", {
+    (prompt: string) =>
+      runDesignJob(prompt, () =>
+        fetch("/api/admin/designs", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ catalogueId: catalogue.id, prompt }),
-        });
-        const data = (await res.json().catch(() => ({}))) as {
-          design?: { id: string; thumbUrl: string; url: string; prompt: string };
-          error?: string;
-        };
-        if (!res.ok || !data.design) throw new Error(data.error ?? "Generation failed");
-        const real = data.design;
-        setDesignList((cur) => cur.map((d) => (d.id === tempId ? { ...real } : d)));
-      } catch (e) {
-        setDesignList((cur) => cur.filter((d) => d.id !== tempId));
-        if (typeof window !== "undefined") window.alert(e instanceof Error ? e.message : "Generation failed");
-      }
-    },
-    [catalogue.id],
+        }),
+      ),
+    [catalogue.id, runDesignJob],
+  );
+
+  // "Aa Text" → generate a lettering graphic from the typed text.
+  const onText = useCallback(
+    (text: string) =>
+      onPrompt(
+        `The words "${text}" as a bold, high-contrast lettering graphic with clean typography, ` +
+          "centered, transparent background, suitable for printing on apparel.",
+      ),
+    [onPrompt],
+  );
+
+  // Upload your own image → stored as a design like a generated one.
+  const onUpload = useCallback(
+    (dataUrl: string, name: string) =>
+      runDesignJob(name || "Uploaded image", () =>
+        fetch("/api/admin/designs/upload", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ catalogueId: catalogue.id, dataUrl, name }),
+        }),
+      ),
+    [catalogue.id, runDesignJob],
+  );
+
+  // Merge two designs into a new one via a "collision" prompt.
+  const onMerge = useCallback(
+    (t: MergeTarget, prompt: string) =>
+      runDesignJob("Merge", () =>
+        fetch("/api/admin/designs/merge", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            catalogueId: catalogue.id,
+            designAId: t.a.designId,
+            designBId: t.b.designId,
+            prompt,
+          }),
+        }),
+      ),
+    [catalogue.id, runDesignJob],
   );
 
   return (
@@ -461,7 +535,7 @@ function DesignerInner({ catalogue, catalogues, initialNodes, designs, blanks }:
         </div>
 
         <aside className="hidden w-72 shrink-0 border-l border-bone/10 lg:block">
-          <ChatPanel onSubmit={onPrompt} variant="side" />
+          <ChatPanel onSubmit={onPrompt} onUpload={onUpload} onText={onText} variant="side" />
         </aside>
       </div>
 
@@ -471,7 +545,7 @@ function DesignerInner({ catalogue, catalogues, initialNodes, designs, blanks }:
       </div>
 
       {/* Mobile chat */}
-      <ChatPanel onSubmit={onPrompt} variant="mobile" />
+      <ChatPanel onSubmit={onPrompt} onUpload={onUpload} onText={onText} variant="mobile" />
 
       {modalCompId ? (
         <CompositionModal
@@ -490,6 +564,27 @@ function DesignerInner({ catalogue, catalogues, initialNodes, designs, blanks }:
             setCombineTarget(null);
             if (t) combine(t, placement);
           }}
+        />
+      ) : null}
+
+      {mergeTarget ? (
+        <MergeDialog
+          target={mergeTarget}
+          onCancel={() => setMergeTarget(null)}
+          onConfirm={(prompt) => {
+            const t = mergeTarget;
+            setMergeTarget(null);
+            if (t) onMerge(t, prompt);
+          }}
+        />
+      ) : null}
+
+      {previewDesign ? (
+        <DesignPreviewModal
+          url={previewDesign.url}
+          prompt={previewDesign.prompt}
+          onClose={() => setPreviewDesign(null)}
+          onAdd={() => addDesign(previewDesign)}
         />
       ) : null}
     </div>

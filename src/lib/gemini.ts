@@ -82,6 +82,15 @@ export async function generateDesign(prompt: string): Promise<Buffer> {
   return generateImage([{ text: `${DESIGN_SYSTEM}\n\nDesign: ${prompt}` }]);
 }
 
+/** Merge two design graphics into one, guided by a "how should they collide" prompt. */
+export async function mergeDesigns(urlA: string, urlB: string, prompt: string): Promise<Buffer> {
+  const [a, b] = await Promise.all([fetchAsInlineData(urlA), fetchAsInlineData(urlB)]);
+  const instruction =
+    `Combine these two graphics into a single cohesive clothing design. ${prompt}. ` +
+    "Solid or transparent background, high contrast, square aspect ratio, suitable for direct-to-garment printing.";
+  return generateImage([{ text: instruction }, a, b]);
+}
+
 /**
  * Review-only composite: design graphic rendered on the garment photo.
  * `instruction` is the fully-built composition prompt. NOT a print file.

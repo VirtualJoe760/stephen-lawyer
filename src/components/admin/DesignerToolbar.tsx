@@ -60,7 +60,11 @@ export function DesignerToolbar({
         <BoxIcon className="h-4 w-4" />
       </Btn>
       <div className="mx-0.5 h-5 w-px bg-bone/15" />
-      <Btn disabled={!canCombine} onClick={onCombine} title="Combine selected design + product">
+      <Btn
+        disabled={!canCombine}
+        onClick={onCombine}
+        title="Combine selection — design + product, or merge two designs"
+      >
         <Merge className="h-4 w-4" />
       </Btn>
     </div>
