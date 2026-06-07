@@ -1,17 +1,29 @@
 "use client";
 import { memo } from "react";
-import type { NodeProps } from "@xyflow/react";
+import { useReactFlow, type NodeProps } from "@xyflow/react";
 
 export type DesignNodeData = { designId: string; thumbUrl?: string; prompt?: string };
 
-export const DesignNode = memo(function DesignNode({ data, selected }: NodeProps) {
+export const DesignNode = memo(function DesignNode({ id, data, selected }: NodeProps) {
+  const { deleteElements } = useReactFlow();
   const d = data as DesignNodeData;
   return (
     <div
-      className={`w-40 select-none rounded-md border bg-ink-soft p-2 text-bone shadow-lg ${
+      className={`relative w-40 select-none rounded-md border bg-ink-soft p-2 text-bone shadow-lg ${
         selected ? "border-hazard" : "border-bone/20"
       }`}
     >
+      <button
+        onMouseDown={(e) => e.stopPropagation()}
+        onClick={(e) => {
+          e.stopPropagation();
+          deleteElements({ nodes: [{ id }] });
+        }}
+        title="Remove from canvas"
+        className="absolute -right-2 -top-2 z-10 flex h-5 w-5 items-center justify-center rounded-full border border-bone/20 bg-ink text-xs leading-none text-bone/70 hover:border-hazard hover:text-hazard"
+      >
+        ×
+      </button>
       <div className="aspect-square overflow-hidden rounded bg-bone/5">
         {d.thumbUrl ? (
           // eslint-disable-next-line @next/next/no-img-element

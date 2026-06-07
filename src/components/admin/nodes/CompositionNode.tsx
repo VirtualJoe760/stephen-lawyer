@@ -1,6 +1,6 @@
 "use client";
 import { memo } from "react";
-import type { NodeProps } from "@xyflow/react";
+import { useReactFlow, type NodeProps } from "@xyflow/react";
 
 export type CompositionNodeData = {
   compositionId: string;
@@ -8,16 +8,28 @@ export type CompositionNodeData = {
   previewUrl?: string | null;
 };
 
-export const CompositionNode = memo(function CompositionNode({ data, selected }: NodeProps) {
+export const CompositionNode = memo(function CompositionNode({ id, data, selected }: NodeProps) {
+  const { deleteElements } = useReactFlow();
   const c = data as CompositionNodeData;
   const generating = c.status === "generating";
   const failed = c.status === "failed";
   return (
     <div
-      className={`w-48 cursor-pointer select-none rounded-md border bg-ink-soft p-2 text-bone shadow-lg ${
+      className={`relative w-48 cursor-pointer select-none rounded-md border bg-ink-soft p-2 text-bone shadow-lg ${
         selected ? "border-hazard" : "border-bone/20"
       }`}
     >
+      <button
+        onMouseDown={(e) => e.stopPropagation()}
+        onClick={(e) => {
+          e.stopPropagation();
+          deleteElements({ nodes: [{ id }] });
+        }}
+        title="Remove from canvas"
+        className="absolute -right-2 -top-2 z-10 flex h-5 w-5 items-center justify-center rounded-full border border-bone/20 bg-ink text-xs leading-none text-bone/70 hover:border-hazard hover:text-hazard"
+      >
+        ×
+      </button>
       <div className="relative aspect-square overflow-hidden rounded bg-bone/5">
         {c.previewUrl && !generating ? (
           // eslint-disable-next-line @next/next/no-img-element

@@ -20,8 +20,13 @@ export function TemplatesRail({
             horizontal ? "w-28" : "w-full"
           }`}
         >
-          <div className="flex aspect-square items-center justify-center rounded bg-bone/5 text-[10px] font-mono uppercase tracking-widest text-bone/40">
-            Tap to add
+          <div className="flex aspect-square items-center justify-center overflow-hidden rounded bg-bone/5">
+            {t.mockupUrl ? (
+              // eslint-disable-next-line @next/next/no-img-element
+              <img src={t.mockupUrl} alt={t.name} className="h-full w-full object-contain" draggable={false} />
+            ) : (
+              <span className="text-[10px] font-mono uppercase tracking-widest text-bone/40">Tap to add</span>
+            )}
           </div>
           <p className="mt-1 truncate text-[11px] font-mono uppercase tracking-wide text-bone/80">
             {t.name}
