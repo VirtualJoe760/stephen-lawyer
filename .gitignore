@@ -16,3 +16,6 @@ sanity/dist
 .idea
 .vscode
 temp_images
+
+.vercel
+.env*.local

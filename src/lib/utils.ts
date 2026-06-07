@@ -31,4 +31,4 @@ export function slugify(s: string): string {
     .replace(/(^-|-$)/g, "");
 }
 
-export const SITE_URL = process.env.NEXT_PUBLIC_SITE_URL ?? "https://stephenlawyer.clothing";
+export const SITE_URL = process.env.NEXT_PUBLIC_SITE_URL || "https://stephenlawyer.clothing";
