@@ -8,7 +8,7 @@ export default function robots(): MetadataRoute.Robots {
         userAgent: "*",
         allow: "/",
         // Thin/private/transactional routes with no search value.
-        disallow: ["/account", "/account/", "/api/", "/cart", "/order", "/order/", "/sign-in"],
+        disallow: ["/admin", "/admin/", "/account", "/account/", "/api/", "/cart", "/order", "/order/", "/sign-in"],
       },
     ],
     sitemap: `${SITE_URL}/sitemap.xml`,

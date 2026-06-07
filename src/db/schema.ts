@@ -208,3 +208,111 @@ export type OrderItem = typeof orderItems.$inferSelect;
 export type Address = typeof addresses.$inferSelect;
 
 export const _sql = sql;
+
+// ---------- Admin design generator ----------
+
+export const catalogues = pgTable("catalogues", {
+  id: uuid("id").defaultRandom().primaryKey(),
+  name: text("name").notNull(),
+  slug: text("slug").notNull().unique(),
+  isActive: boolean("is_active").notNull().default(true),
+  sortOrder: integer("sort_order").notNull().default(0),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+});
+
+export const designs = pgTable(
+  "designs",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    catalogueId: uuid("catalogue_id")
+      .notNull()
+      .references(() => catalogues.id, { onDelete: "cascade" }),
+    prompt: text("prompt").notNull(),
+    cloudinaryPublicId: text("cloudinary_public_id").notNull(),
+    url: text("url").notNull(),
+    thumbUrl: text("thumb_url").notNull(),
+    createdBy: text("created_by").references(() => users.id),
+    createdAt: timestamp("created_at").notNull().defaultNow(),
+  },
+  (d) => ({ catalogueIdx: index("designs_catalogue_idx").on(d.catalogueId) }),
+);
+
+export const compositionStatus = pgEnum("composition_status", [
+  "generating",
+  "draft",
+  "approved",
+  "published",
+  "failed",
+]);
+
+export const compositions = pgTable(
+  "compositions",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    catalogueId: uuid("catalogue_id")
+      .notNull()
+      .references(() => catalogues.id, { onDelete: "cascade" }),
+    designId: uuid("design_id")
+      .notNull()
+      .references(() => designs.id, { onDelete: "cascade" }),
+    templateKey: text("template_key").notNull(),
+    placement: text("placement").notNull().default("front"),
+    previewUrl: text("preview_url"),
+    status: compositionStatus("status").notNull().default("generating"),
+    printfulSyncProductId: text("printful_sync_product_id"),
+    errorMessage: text("error_message"),
+    createdAt: timestamp("created_at").notNull().defaultNow(),
+    updatedAt: timestamp("updated_at")
+      .notNull()
+      .defaultNow()
+      .$onUpdate(() => new Date()),
+  },
+  (c) => ({ catalogueIdx: index("compositions_catalogue_idx").on(c.catalogueId) }),
+);
+
+export const canvasNodes = pgTable(
+  "canvas_nodes",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    catalogueId: uuid("catalogue_id")
+      .notNull()
+      .references(() => catalogues.id, { onDelete: "cascade" }),
+    kind: text("kind").notNull(), // "template" | "design" | "composition"
+    refId: text("ref_id").notNull(), // designId / compositionId / templateKey
+    x: integer("x").notNull().default(0),
+    y: integer("y").notNull().default(0),
+    scale: integer("scale").notNull().default(100), // percent
+    zIndex: integer("z_index").notNull().default(0),
+    updatedAt: timestamp("updated_at")
+      .notNull()
+      .defaultNow()
+      .$onUpdate(() => new Date()),
+  },
+  (n) => ({ catalogueIdx: index("canvas_nodes_catalogue_idx").on(n.catalogueId) }),
+);
+
+export const cataloguesRelations = relations(catalogues, ({ many }) => ({
+  designs: many(designs),
+  compositions: many(compositions),
+  canvasNodes: many(canvasNodes),
+}));
+
+export const designsRelations = relations(designs, ({ one, many }) => ({
+  catalogue: one(catalogues, { fields: [designs.catalogueId], references: [catalogues.id] }),
+  creator: one(users, { fields: [designs.createdBy], references: [users.id] }),
+  compositions: many(compositions),
+}));
+
+export const compositionsRelations = relations(compositions, ({ one }) => ({
+  catalogue: one(catalogues, { fields: [compositions.catalogueId], references: [catalogues.id] }),
+  design: one(designs, { fields: [compositions.designId], references: [designs.id] }),
+}));
+
+export const canvasNodesRelations = relations(canvasNodes, ({ one }) => ({
+  catalogue: one(catalogues, { fields: [canvasNodes.catalogueId], references: [catalogues.id] }),
+}));
+
+export type Catalogue = typeof catalogues.$inferSelect;
+export type Design = typeof designs.$inferSelect;
+export type Composition = typeof compositions.$inferSelect;
+export type CanvasNode = typeof canvasNodes.$inferSelect;

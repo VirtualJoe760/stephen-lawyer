@@ -171,3 +171,43 @@ export async function createOrder(input: PrintfulOrderInput, idempotencyKey: str
 export async function getOrder(id: string | number): Promise<PrintfulOrder> {
   return request<PrintfulOrder>(`/orders/${id}`);
 }
+
+// ---------- Sync product creation (admin design generator) ----------
+
+export interface CreateSyncProductInput {
+  sync_product: { name: string; thumbnail?: string };
+  sync_variants: Array<{
+    variant_id: number; // Printful catalog variant id
+    retail_price: string; // "29.99"
+    files: Array<{ type: string; url: string }>;
+  }>;
+}
+
+export async function createSyncProduct(
+  input: CreateSyncProductInput,
+  idempotencyKey?: string,
+): Promise<PrintfulSyncProductDetail> {
+  return request<PrintfulSyncProductDetail>("/store/products", {
+    method: "POST",
+    body: input,
+    idempotencyKey,
+  });
+}
+
+// ---------- Catalog variant lookup (for finalize pricing) ----------
+
+export interface PrintfulCatalogVariant {
+  id: number;
+  product_id: number;
+  name: string;
+  size: string;
+  color: string;
+  in_stock: boolean;
+  price: string;
+}
+
+export async function getCatalogVariant(id: number): Promise<PrintfulCatalogVariant> {
+  // GET /products/variant/{id} wraps the variant alongside its product.
+  const result = await request<{ variant: PrintfulCatalogVariant }>(`/products/variant/${id}`);
+  return result.variant;
+}
