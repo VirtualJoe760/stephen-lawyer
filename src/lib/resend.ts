@@ -4,7 +4,7 @@ const apiKey = process.env.RESEND_API_KEY;
 
 export const resend = apiKey ? new Resend(apiKey) : null;
 
-export const RESEND_FROM = process.env.RESEND_FROM_EMAIL ?? "STEPHEN LAWYER <hello@stephenlawyer.com>";
+export const RESEND_FROM = process.env.RESEND_FROM_EMAIL ?? "STEPHEN LAWYER <hello@stephenlawyer.clothing>";
 
 export async function sendOrderConfirmation(opts: {
   to: string;

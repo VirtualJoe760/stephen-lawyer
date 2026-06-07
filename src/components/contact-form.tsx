@@ -65,7 +65,7 @@ export function ContactForm() {
       </Button>
       {state === "error" && (
         <p className="font-mono text-xs uppercase tracking-widest text-hazard">
-          Something broke. Try again, or email hello@stephenlawyer.com.
+          Something broke. Try again, or email hello@stephenlawyer.clothing.
         </p>
       )}
     </form>

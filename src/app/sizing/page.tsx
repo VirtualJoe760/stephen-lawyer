@@ -61,7 +61,7 @@ export default function Sizing() {
         <Table title="Tees" rows={TEES} />
         <Table title="Hoodies" rows={HOODIES} />
         <p className="mt-8 font-mono text-xs uppercase tracking-widest text-ink/60">
-          Still unsure? Email hello@stephenlawyer.com.
+          Still unsure? Email hello@stephenlawyer.clothing.
         </p>
       </div>
     </div>

@@ -1,4 +1,4 @@
-# stephenlawyer.com
+# stephenlawyer.clothing
 
 Direct-to-consumer e-commerce site for skateboarder Stephen Lawyer. Next.js 15 App Router, TypeScript strict, Tailwind v4. Stripe Checkout for payments, Printful for print-on-demand fulfillment, Postgres (Neon) via Drizzle, NextAuth v5, Sanity for editorial.
 
@@ -46,9 +46,9 @@ Cart → `POST /api/checkout` → Stripe Checkout Session (with Printful-derived
 
 1. Connect the repo.
 2. Set all env vars from `.env.example` in Vercel project settings.
-3. Add the production domain (`stephenlawyer.com`).
-4. Configure Stripe webhook to point at `https://stephenlawyer.com/api/stripe/webhook`.
-5. Configure Printful webhook to point at `https://stephenlawyer.com/api/printful/webhook`.
+3. Add the production domain (`stephenlawyer.clothing`).
+4. Configure Stripe webhook to point at `https://stephenlawyer.clothing/api/stripe/webhook`.
+5. Configure Printful webhook to point at `https://stephenlawyer.clothing/api/printful/webhook`.
 6. Vercel Cron: `0 8 * * *` → `/api/cron/sync-printful` (set `CRON_SECRET`).
 
 ## Out of scope for v1

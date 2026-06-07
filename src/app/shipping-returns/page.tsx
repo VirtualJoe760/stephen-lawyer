@@ -27,7 +27,7 @@ export default function ShippingReturns() {
 
         <h2 className="wordmark text-3xl mt-10 mb-3">Returns</h2>
         <p className="text-base leading-relaxed">
-          Because everything is made-to-order, we can't accept general returns or size exchanges. If your item arrives damaged or misprinted, email <a href="mailto:hello@stephenlawyer.com" className="underline hover:text-hazard">hello@stephenlawyer.com</a> within 14 days with photos and we'll make it right.
+          Because everything is made-to-order, we can't accept general returns or size exchanges. If your item arrives damaged or misprinted, email <a href="mailto:hello@stephenlawyer.clothing" className="underline hover:text-hazard">hello@stephenlawyer.clothing</a> within 14 days with photos and we'll make it right.
         </p>
 
         <h2 className="wordmark text-3xl mt-10 mb-3">Lost packages</h2>

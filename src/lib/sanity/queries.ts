@@ -24,7 +24,7 @@ const FALLBACK_FAQ = [
     id: "returns",
     question: "Can I return something?",
     answer:
-      "Because everything is print-on-demand, returns are limited to damaged or misprinted items. Email contact@stephenlawyer.com within 14 days of delivery with photos.",
+      "Because everything is print-on-demand, returns are limited to damaged or misprinted items. Email contact@stephenlawyer.clothing within 14 days of delivery with photos.",
   },
   {
     id: "custom",

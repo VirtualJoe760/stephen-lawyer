@@ -16,7 +16,7 @@ export default function Privacy() {
           <h2 className="wordmark text-3xl mt-8">Cookies</h2>
           <p>Strictly necessary cookies for authentication and cart persistence. No advertising cookies.</p>
           <h2 className="wordmark text-3xl mt-8">Your rights</h2>
-          <p>Email <a href="mailto:privacy@stephenlawyer.com" className="underline hover:text-hazard">privacy@stephenlawyer.com</a> to request access, correction, or deletion of your data.</p>
+          <p>Email <a href="mailto:privacy@stephenlawyer.clothing" className="underline hover:text-hazard">privacy@stephenlawyer.clothing</a> to request access, correction, or deletion of your data.</p>
         </div>
       </article>
     </div>

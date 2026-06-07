@@ -9,7 +9,7 @@ const schema = z.object({
   message: z.string().min(5).max(5000),
 });
 
-const CONTACT_INBOX = process.env.CONTACT_INBOX_EMAIL ?? "hello@stephenlawyer.com";
+const CONTACT_INBOX = process.env.CONTACT_INBOX_EMAIL ?? "hello@stephenlawyer.clothing";
 
 export async function POST(req: Request) {
   const parsed = schema.safeParse(await req.json());
