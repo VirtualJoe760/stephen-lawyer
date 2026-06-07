@@ -72,14 +72,31 @@ async function generateImage(parts: InlinePart[], attempts = 3): Promise<Buffer>
   throw lastErr;
 }
 
-const DESIGN_SYSTEM =
-  "Generate a clothing graphic suitable for direct-to-garment printing. " +
-  "Solid or transparent background. High contrast. No text unless explicitly requested. " +
-  "Square aspect ratio.";
+export interface DesignOptions {
+  background?: "transparent" | "filled";
+  aspectRatio?: string; // e.g. "1:1", "4:5", "16:9" — only meaningful when filled
+}
+
+const ALLOWED_RATIOS = new Set(["1:1", "4:5", "3:4", "2:3", "3:2", "16:9", "9:16"]);
+
+function designSystem(opts?: DesignOptions): string {
+  if (opts?.background === "filled") {
+    const ar = opts.aspectRatio && ALLOWED_RATIOS.has(opts.aspectRatio) ? opts.aspectRatio : "1:1";
+    return (
+      "Generate finished graphic art with a complete background that fills the entire frame edge to edge " +
+      `(no transparency). Compose it in a ${ar} aspect ratio. High contrast, bold, print-ready.`
+    );
+  }
+  return (
+    "Generate a clothing graphic suitable for direct-to-garment printing. " +
+    "Fully transparent background — PNG alpha, no backdrop, no white box behind the art. " +
+    "High contrast. No text unless explicitly requested. Square aspect ratio."
+  );
+}
 
 /** Generate a standalone design graphic from a text prompt. Returns PNG bytes. */
-export async function generateDesign(prompt: string): Promise<Buffer> {
-  return generateImage([{ text: `${DESIGN_SYSTEM}\n\nDesign: ${prompt}` }]);
+export async function generateDesign(prompt: string, opts?: DesignOptions): Promise<Buffer> {
+  return generateImage([{ text: `${designSystem(opts)}\n\nDesign: ${prompt}` }]);
 }
 
 /** Merge two design graphics into one, guided by a "how should they collide" prompt. */

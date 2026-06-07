@@ -2,21 +2,30 @@
 import { useRef, useState } from "react";
 import { TextDialog } from "./TextDialog";
 
-function useChat(onSubmit: (p: string) => void | Promise<void>) {
+export type Background = "transparent" | "filled";
+export interface DesignOptions {
+  background: Background;
+  aspectRatio: string;
+}
+const RATIOS = ["1:1", "4:5", "3:4", "2:3", "3:2", "16:9", "9:16"];
+
+function useChat(onSubmit: (p: string, opts: DesignOptions) => void | Promise<void>) {
   const [prompt, setPrompt] = useState("");
   const [pending, setPending] = useState(false);
+  const [background, setBackground] = useState<Background>("transparent");
+  const [aspectRatio, setAspectRatio] = useState("1:1");
   async function submit() {
     const p = prompt.trim();
     if (!p || pending) return;
     setPending(true);
     try {
-      await onSubmit(p);
+      await onSubmit(p, { background, aspectRatio });
       setPrompt("");
     } finally {
       setPending(false);
     }
   }
-  return { prompt, setPrompt, pending, submit };
+  return { prompt, setPrompt, pending, submit, background, setBackground, aspectRatio, setAspectRatio };
 }
 
 function fileToDataUrl(file: File): Promise<string> {
@@ -26,6 +35,54 @@ function fileToDataUrl(file: File): Promise<string> {
     r.onerror = () => reject(r.error ?? new Error("Read failed"));
     r.readAsDataURL(file);
   });
+}
+
+// Transparent vs filled background, plus aspect ratio when filled.
+function BackgroundControls({
+  background,
+  setBackground,
+  aspectRatio,
+  setAspectRatio,
+}: {
+  background: Background;
+  setBackground: (b: Background) => void;
+  aspectRatio: string;
+  setAspectRatio: (r: string) => void;
+}) {
+  return (
+    <div className="mt-2 space-y-2">
+      <div className="flex rounded border border-bone/20 p-0.5 text-[10px] font-mono uppercase tracking-widest">
+        <button
+          onClick={() => setBackground("transparent")}
+          className={`flex-1 rounded px-2 py-1 ${background === "transparent" ? "bg-hazard text-bone" : "text-bone/50 hover:text-bone"}`}
+        >
+          Transparent
+        </button>
+        <button
+          onClick={() => setBackground("filled")}
+          className={`flex-1 rounded px-2 py-1 ${background === "filled" ? "bg-hazard text-bone" : "text-bone/50 hover:text-bone"}`}
+        >
+          Background
+        </button>
+      </div>
+      {background === "filled" ? (
+        <div className="flex items-center gap-2">
+          <span className="text-[10px] font-mono uppercase tracking-widest text-bone/50">Ratio</span>
+          <select
+            value={aspectRatio}
+            onChange={(e) => setAspectRatio(e.target.value)}
+            className="flex-1 rounded border border-bone/20 bg-ink px-2 py-1 text-xs text-bone focus:border-hazard focus:outline-none"
+          >
+            {RATIOS.map((r) => (
+              <option key={r} value={r}>
+                {r}
+              </option>
+            ))}
+          </select>
+        </div>
+      ) : null}
+    </div>
+  );
 }
 
 // Shared row: upload an image, or add a text graphic.
@@ -88,11 +145,11 @@ function SideForm({
   onUpload,
   onText,
 }: {
-  onSubmit: (p: string) => void | Promise<void>;
+  onSubmit: (p: string, opts: DesignOptions) => void | Promise<void>;
   onUpload: (dataUrl: string, name: string) => void | Promise<void>;
   onText: (text: string, style: string) => void | Promise<void>;
 }) {
-  const { prompt, setPrompt, pending, submit } = useChat(onSubmit);
+  const c = useChat(onSubmit);
   return (
     <div className="flex h-full flex-col">
       <div className="flex-1 overflow-y-auto p-3 text-xs text-bone/40">
@@ -104,21 +161,27 @@ function SideForm({
       </div>
       <div className="border-t border-bone/10 p-2">
         <textarea
-          value={prompt}
-          onChange={(e) => setPrompt(e.target.value)}
+          value={c.prompt}
+          onChange={(e) => c.setPrompt(e.target.value)}
           onKeyDown={(e) => {
-            if (e.key === "Enter" && (e.metaKey || e.ctrlKey)) submit();
+            if (e.key === "Enter" && (e.metaKey || e.ctrlKey)) c.submit();
           }}
           rows={3}
           placeholder="e.g. tri-color camo skull, transparent background"
           className="w-full resize-none rounded border border-bone/20 bg-ink px-2 py-1 text-sm text-bone placeholder:text-bone/30 focus:border-hazard focus:outline-none"
         />
+        <BackgroundControls
+          background={c.background}
+          setBackground={c.setBackground}
+          aspectRatio={c.aspectRatio}
+          setAspectRatio={c.setAspectRatio}
+        />
         <button
-          onClick={submit}
-          disabled={pending}
+          onClick={c.submit}
+          disabled={c.pending}
           className="mt-2 w-full rounded bg-hazard px-3 py-2 text-xs font-bold uppercase tracking-widest text-bone disabled:opacity-50"
         >
-          {pending ? "Generating…" : "Generate"}
+          {c.pending ? "Generating…" : "Generate"}
         </button>
         <div className="mt-2">
           <DesignActions onUpload={onUpload} onText={onText} />
@@ -136,12 +199,12 @@ function MobileChat({
   onText,
   onClose,
 }: {
-  onSubmit: (p: string) => void | Promise<void>;
+  onSubmit: (p: string, opts: DesignOptions) => void | Promise<void>;
   onUpload: (dataUrl: string, name: string) => void | Promise<void>;
   onText: (text: string, style: string) => void | Promise<void>;
   onClose: () => void;
 }) {
-  const { prompt, setPrompt, pending, submit } = useChat(onSubmit);
+  const c = useChat(onSubmit);
   return (
     <div className="fixed inset-0 z-50 flex flex-col bg-ink lg:hidden">
       <div className="flex items-center justify-between border-b border-bone/10 p-3">
@@ -153,21 +216,27 @@ function MobileChat({
       <div className="p-3">
         <textarea
           autoFocus
-          value={prompt}
-          onChange={(e) => setPrompt(e.target.value)}
+          value={c.prompt}
+          onChange={(e) => c.setPrompt(e.target.value)}
           rows={3}
           placeholder="e.g. tri-color camo skull, transparent background"
           className="w-full resize-none rounded border border-bone/20 bg-ink px-3 py-2 text-bone placeholder:text-bone/30 focus:border-hazard focus:outline-none"
         />
+        <BackgroundControls
+          background={c.background}
+          setBackground={c.setBackground}
+          aspectRatio={c.aspectRatio}
+          setAspectRatio={c.setAspectRatio}
+        />
         <button
           onClick={async () => {
-            await submit();
+            await c.submit();
             onClose();
           }}
-          disabled={pending}
+          disabled={c.pending}
           className="mt-3 w-full rounded bg-hazard px-3 py-3 text-sm font-bold uppercase tracking-widest text-bone disabled:opacity-50"
         >
-          {pending ? "Generating…" : "Generate"}
+          {c.pending ? "Generating…" : "Generate"}
         </button>
         <div className="mt-3">
           <DesignActions onUpload={onUpload} onText={onText} />
@@ -189,7 +258,7 @@ export function ChatPanel({
   onText,
   variant = "side",
 }: {
-  onSubmit: (p: string) => void | Promise<void>;
+  onSubmit: (p: string, opts: DesignOptions) => void | Promise<void>;
   onUpload: (dataUrl: string, name: string) => void | Promise<void>;
   onText: (text: string, style: string) => void | Promise<void>;
   variant?: "side" | "mobile";

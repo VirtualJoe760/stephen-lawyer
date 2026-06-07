@@ -25,19 +25,26 @@ export async function POST(req: Request) {
   const denied = await requireAdminRoute();
   if (denied) return denied;
 
-  const body = (await req.json().catch(() => null)) as { catalogueId?: string; prompt?: string } | null;
+  const body = (await req.json().catch(() => null)) as {
+    catalogueId?: string;
+    prompt?: string;
+    background?: "transparent" | "filled";
+    aspectRatio?: string;
+  } | null;
   const catalogueId = body?.catalogueId?.trim();
   const prompt = body?.prompt?.trim();
   if (!catalogueId || !prompt) {
     return Response.json({ error: "catalogueId and prompt are required" }, { status: 400 });
   }
+  const background = body?.background === "filled" ? "filled" : "transparent";
+  const aspectRatio = typeof body?.aspectRatio === "string" ? body.aspectRatio : undefined;
 
   const [cat] = await db.select().from(catalogues).where(eq(catalogues.id, catalogueId)).limit(1);
   if (!cat) return Response.json({ error: "Catalogue not found" }, { status: 404 });
 
   let png: Buffer;
   try {
-    png = await generateDesign(prompt);
+    png = await generateDesign(prompt, { background, aspectRatio });
   } catch (e) {
     return Response.json({ error: friendlyAiError(e) }, { status: 502 });
   }

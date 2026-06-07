@@ -21,7 +21,7 @@ import { CompositionNode } from "./nodes/CompositionNode";
 import { LabelNode } from "./nodes/LabelNode";
 import { TemplatesRail } from "./TemplatesRail";
 import { DesignsHistoryBar } from "./DesignsHistoryBar";
-import { ChatPanel } from "./ChatPanel";
+import { ChatPanel, type DesignOptions } from "./ChatPanel";
 import { CatalogueSwitcher } from "./CatalogueSwitcher";
 import { CompositionModal } from "./CompositionModal";
 import { DesignerToolbar, type ToolMode } from "./DesignerToolbar";
@@ -446,24 +446,31 @@ function DesignerInner({ catalogue, catalogues, initialNodes, designs, compositi
   }, []);
 
   const onPrompt = useCallback(
-    (prompt: string) =>
+    (prompt: string, opts: DesignOptions) =>
       runDesignJob(prompt, () =>
         fetch("/api/admin/designs", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ catalogueId: catalogue.id, prompt }),
+          body: JSON.stringify({
+            catalogueId: catalogue.id,
+            prompt,
+            background: opts.background,
+            aspectRatio: opts.aspectRatio,
+          }),
         }),
       ),
     [catalogue.id, runDesignJob],
   );
 
   // "Aa Text" → generate a lettering graphic from the typed text (+ optional style).
+  // Lettering is always transparent so it drops cleanly onto garments.
   const onText = useCallback(
     (text: string, style: string) =>
       onPrompt(
         `The words "${text}" as a bold, high-contrast lettering graphic with clean typography` +
           (style ? `, ${style} style` : "") +
           ", centered, transparent background, suitable for printing on apparel.",
+        { background: "transparent", aspectRatio: "1:1" },
       ),
     [onPrompt],
   );
