@@ -45,22 +45,33 @@ export async function PUT(req: Request, { params }: Ctx) {
   const incoming = Array.isArray(body?.nodes) ? body!.nodes! : null;
   if (!incoming) return Response.json({ error: "nodes array required" }, { status: 400 });
 
-  await db.delete(canvasNodes).where(eq(canvasNodes.catalogueId, cat.id));
-  if (incoming.length) {
-    await db.insert(canvasNodes).values(
-      incoming
-        .filter((n) => n.kind && n.refId)
-        .map((n) => ({
-          ...(typeof n.id === "string" && n.id.length === 36 ? { id: n.id } : {}),
-          catalogueId: cat.id,
-          kind: String(n.kind),
-          refId: String(n.refId),
-          x: Math.round(Number(n.x) || 0),
-          y: Math.round(Number(n.y) || 0),
-          scale: Math.round(Number(n.scale) || 100),
-          zIndex: Math.round(Number(n.zIndex) || 0),
-        })),
-    );
-  }
+  // Replace-all, concurrency-safe: dedupe incoming ids and run delete+insert in
+  // one transaction so overlapping debounced saves can't collide on the pkey.
+  const seen = new Set<string>();
+  const rows = incoming
+    .filter((n) => n.kind && n.refId)
+    .filter((n) => {
+      const id = typeof n.id === "string" && n.id.length === 36 ? n.id : "";
+      if (id) {
+        if (seen.has(id)) return false;
+        seen.add(id);
+      }
+      return true;
+    })
+    .map((n) => ({
+      ...(typeof n.id === "string" && n.id.length === 36 ? { id: n.id } : {}),
+      catalogueId: cat.id,
+      kind: String(n.kind),
+      refId: String(n.refId),
+      x: Math.round(Number(n.x) || 0),
+      y: Math.round(Number(n.y) || 0),
+      scale: Math.round(Number(n.scale) || 100),
+      zIndex: Math.round(Number(n.zIndex) || 0),
+    }));
+
+  await db.transaction(async (tx) => {
+    await tx.delete(canvasNodes).where(eq(canvasNodes.catalogueId, cat.id));
+    if (rows.length) await tx.insert(canvasNodes).values(rows);
+  });
   return Response.json({ ok: true });
 }
