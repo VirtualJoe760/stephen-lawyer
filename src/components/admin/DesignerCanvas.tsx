@@ -18,6 +18,7 @@ import type { CatalogBlank } from "@/lib/printful/catalog";
 import { TemplateNode } from "./nodes/TemplateNode";
 import { DesignNode } from "./nodes/DesignNode";
 import { CompositionNode } from "./nodes/CompositionNode";
+import { LabelNode } from "./nodes/LabelNode";
 import { TemplatesRail } from "./TemplatesRail";
 import { DesignsHistoryBar } from "./DesignsHistoryBar";
 import { ChatPanel } from "./ChatPanel";
@@ -60,6 +61,7 @@ const nodeTypes: NodeTypes = {
   template: TemplateNode,
   design: DesignNode,
   composition: CompositionNode,
+  label: LabelNode,
 };
 
 const SIZES = {
@@ -113,6 +115,9 @@ function rowToFlowNode(
       data: { compositionId: r.refId, status: "draft" },
     };
   }
+  if (r.kind === "label") {
+    return { id: r.id, type: "label", position, data: { text: r.refId } };
+  }
   const b = blanksById.get(r.refId);
   return {
     id: r.id,
@@ -130,7 +135,9 @@ function flowNodeToRow(n: Node): CanvasNodeRow {
       ? str(n.data, "designId")
       : kind === "composition"
         ? str(n.data, "compositionId")
-        : str(n.data, "productId");
+        : kind === "label"
+          ? str(n.data, "text")
+          : str(n.data, "productId");
   return {
     id: n.id,
     kind,
@@ -225,36 +232,58 @@ function DesignerInner({ catalogue, catalogues, initialNodes, designs, blanks }:
     [persist],
   );
 
-  const createComposition = useCallback(
-    async (
-      designId: string,
-      productId: string,
-      mockupUrl: string,
-      placement: string,
-      position: { x: number; y: number },
-    ) => {
-      if (!designId || !productId) return;
+  // Combine a design + product → a horizontal group: design + product = composite,
+  // with "+"/"=" separators and an editable group-name label above.
+  const combine = useCallback(
+    async (target: CombineTarget, placement: string) => {
+      const { design, template } = target;
+      if (!design.designId || !template.productId) return;
+      const COL = 175;
+      const gx = template.position.x;
+      const gy = template.position.y;
+      const compositePos = { x: gx + 2 * COL, y: gy };
       const tempId = crypto.randomUUID();
-      const skeleton: Node = {
-        id: tempId,
-        type: "composition",
-        position,
-        ...SIZES.composition,
-        data: { compositionId: "", status: "generating" },
-      };
-      setNodes((cur) => [...cur, skeleton]);
+      const nameId = crypto.randomUUID();
+      const plusId = crypto.randomUUID();
+      const eqId = crypto.randomUUID();
+      const groupNum =
+        nodes.filter((n) => n.type === "label" && !["+", "="].includes(str(n.data, "text"))).length + 1;
+
+      setNodes((cur) => {
+        const next = cur
+          .map((n) => {
+            if (n.id === design.nodeId) return { ...n, position: { x: gx, y: gy } };
+            if (n.id === template.nodeId) return { ...n, position: { x: gx + COL, y: gy } };
+            return n;
+          })
+          .concat([
+            { id: nameId, type: "label", position: { x: gx, y: gy - 30 }, data: { text: `Group ${groupNum}` } },
+            { id: plusId, type: "label", position: { x: gx + 134, y: gy + 64 }, data: { text: "+" } },
+            { id: eqId, type: "label", position: { x: gx + COL + 134, y: gy + 64 }, data: { text: "=" } },
+            {
+              id: tempId,
+              type: "composition",
+              position: compositePos,
+              ...SIZES.composition,
+              data: { compositionId: "", status: "generating" },
+            },
+          ]);
+        persist(next);
+        return next;
+      });
+
       try {
         const res = await fetch("/api/admin/compositions", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
             catalogueId: catalogue.id,
-            designId,
-            templateKey: productId,
-            mockupUrl,
+            designId: design.designId,
+            templateKey: template.productId,
+            mockupUrl: template.image,
             placement,
-            x: Math.round(position.x),
-            y: Math.round(position.y),
+            x: Math.round(compositePos.x),
+            y: Math.round(compositePos.y),
           }),
         });
         const data = (await res.json().catch(() => ({}))) as {
@@ -279,7 +308,7 @@ function DesignerInner({ catalogue, catalogues, initialNodes, designs, blanks }:
         if (typeof window !== "undefined") window.alert(e instanceof Error ? e.message : "Composition failed");
       }
     },
-    [catalogue.id, persist],
+    [catalogue.id, persist, nodes],
   );
 
   // Drag a design onto a template → open the placement modal (where/all-over).
@@ -291,12 +320,13 @@ function DesignerInner({ catalogue, catalogues, initialNodes, designs, blanks }:
       const tpl = all.find((n) => n.type === "template" && overlaps(dBox, boxOf(n)));
       if (tpl) {
         setCombineTarget({
-          design: { designId: str(dragged.data, "designId") },
+          design: { designId: str(dragged.data, "designId"), nodeId: dragged.id },
           template: {
             productId: str(tpl.data, "productId"),
             name: str(tpl.data, "name"),
             image: str(tpl.data, "image"),
-            position: { x: tpl.position.x + 70, y: tpl.position.y + 70 },
+            nodeId: tpl.id,
+            position: { x: tpl.position.x, y: tpl.position.y },
           },
         });
       }
@@ -330,12 +360,13 @@ function DesignerInner({ catalogue, catalogues, initialNodes, designs, blanks }:
     const template = sel.find((n) => n.type === "template");
     if (!design || !template) return;
     setCombineTarget({
-      design: { designId: str(design.data, "designId") },
+      design: { designId: str(design.data, "designId"), nodeId: design.id },
       template: {
         productId: str(template.data, "productId"),
         name: str(template.data, "name"),
         image: str(template.data, "image"),
-        position: { x: template.position.x + 70, y: template.position.y + 70 },
+        nodeId: template.id,
+        position: { x: template.position.x, y: template.position.y },
       },
     });
   }, [rf]);
@@ -457,7 +488,7 @@ function DesignerInner({ catalogue, catalogues, initialNodes, designs, blanks }:
           onConfirm={(placement) => {
             const t = combineTarget;
             setCombineTarget(null);
-            createComposition(t.design.designId, t.template.productId, t.template.image, placement, t.template.position);
+            if (t) combine(t, placement);
           }}
         />
       ) : null}

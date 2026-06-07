@@ -2,8 +2,8 @@
 import { useEffect, useState } from "react";
 
 export interface CombineTarget {
-  design: { designId: string };
-  template: { productId: string; name: string; image: string; position: { x: number; y: number } };
+  design: { designId: string; nodeId: string };
+  template: { productId: string; name: string; image: string; nodeId: string; position: { x: number; y: number } };
 }
 
 export function CombineDialog({
