@@ -1,7 +1,8 @@
-import { listCatalogProducts, listCategories } from "./client";
+import { listCatalogProducts, listCategories, type PrintfulCategory } from "./client";
 
 // Server-side, full Printful catalog browsing for the design tool.
-// Products are classified into buckets by walking main_category_id to its root.
+// Each product is tagged with a gender bucket (root category) AND a type
+// (the second-level category, e.g. "T-shirts", "Hoodies") for drill-down.
 
 export type BlankCategory = "men" | "women" | "kids" | "accessories";
 
@@ -9,11 +10,10 @@ export interface CatalogBlank {
   id: number;
   name: string;
   image: string;
-  category: BlankCategory;
+  category: BlankCategory; // gender/age bucket
+  type: string; // second-level type, e.g. "T-shirts", "Hoodies", "Bottoms"
 }
 
-// Root Printful category title → our bucket. Roots not listed (Home & living,
-// Collections, Brands, All products) are excluded from the design tool.
 const ROOT_TO_BUCKET: Record<string, BlankCategory> = {
   "Men's clothing": "men",
   "Women's clothing": "women",
@@ -23,26 +23,37 @@ const ROOT_TO_BUCKET: Record<string, BlankCategory> = {
 };
 
 let cache: { at: number; blanks: CatalogBlank[] } | null = null;
-const TTL_MS = 60 * 60 * 1000; // catalog is near-static; cache 1h per server process
+const TTL_MS = 60 * 60 * 1000;
 
 export async function getCatalogBlanks(force = false): Promise<CatalogBlank[]> {
   if (!force && cache && Date.now() - cache.at < TTL_MS) return cache.blanks;
 
   const [products, categories] = await Promise.all([listCatalogProducts(), listCategories()]);
   const byId = new Map(categories.map((c) => [c.id, c]));
-  const rootTitle = (cid: number): string => {
+
+  // Chain from a category id up to its root: [leaf, ..., root].
+  const chainToRoot = (cid: number): PrintfulCategory[] => {
+    const out: PrintfulCategory[] = [];
     let c = byId.get(cid);
     let guard = 0;
-    while (c && c.parent_id && c.parent_id !== 0 && guard++ < 20) c = byId.get(c.parent_id);
-    return c?.title ?? "";
+    while (c && guard++ < 20) {
+      out.push(c);
+      if (!c.parent_id || c.parent_id === 0) break;
+      c = byId.get(c.parent_id);
+    }
+    return out;
   };
 
   const blanks: CatalogBlank[] = [];
   for (const p of products) {
     if (p.is_discontinued) continue;
-    const bucket = ROOT_TO_BUCKET[rootTitle(p.main_category_id)];
+    const chain = chainToRoot(p.main_category_id);
+    const root = chain[chain.length - 1];
+    const bucket = root ? ROOT_TO_BUCKET[root.title] : undefined;
     if (!bucket) continue; // excludes Home & living etc.
-    blanks.push({ id: p.id, name: p.title, image: p.image, category: bucket });
+    // The type is the category directly under the root (second from the end).
+    const type = chain.length >= 2 ? chain[chain.length - 2].title : "Other";
+    blanks.push({ id: p.id, name: p.title, image: p.image, category: bucket, type });
   }
   blanks.sort((a, b) => a.name.localeCompare(b.name));
 
