@@ -1,0 +1,109 @@
+@import "tailwindcss";
+
+@theme {
+  --color-bone: #f4f1ea;
+  --color-bone-50: #faf8f2;
+  --color-bone-100: #f4f1ea;
+  --color-bone-200: #e8e3d5;
+  --color-ink: #0f0f0f;
+  --color-ink-soft: #1a1a1a;
+  --color-ink-line: #2a2a2a;
+  --color-hazard: #ff4a1c;
+  --color-acid: #c8ff3f;
+  --color-cobalt: #1f3dff;
+  --color-pink: #ff2ea0;
+
+  --font-display: var(--font-anton), "Helvetica Now Display", "Akzidenz Grotesk", system-ui, sans-serif;
+  --font-sans: var(--font-inter), "Neue Haas Grotesk", system-ui, sans-serif;
+  --font-mono: var(--font-jetbrains), "IBM Plex Mono", ui-monospace, monospace;
+}
+
+@keyframes ticker {
+  from { transform: translateX(0); }
+  to { transform: translateX(-50%); }
+}
+
+@layer base {
+  :root {
+    color-scheme: light;
+  }
+
+  html, body {
+    background: var(--color-bone);
+    color: var(--color-ink);
+    font-family: var(--font-sans);
+    -webkit-font-smoothing: antialiased;
+    text-rendering: optimizeLegibility;
+  }
+
+  ::selection {
+    background: var(--color-hazard);
+    color: var(--color-bone);
+  }
+
+  *:focus-visible {
+    outline: 2px solid var(--color-hazard);
+    outline-offset: 2px;
+    border-radius: 0;
+  }
+
+  h1, h2, h3, h4 {
+    font-family: var(--font-display);
+    letter-spacing: -0.01em;
+    line-height: 0.9;
+  }
+
+  button { font-family: inherit; }
+}
+
+@utility wordmark {
+  font-family: var(--font-display);
+  letter-spacing: -0.02em;
+  text-transform: uppercase;
+  line-height: 0.85;
+}
+
+@utility newsprint {
+  background-image:
+    radial-gradient(circle at 1px 1px, color-mix(in srgb, var(--color-ink) 18%, transparent) 1px, transparent 0);
+  background-size: 3px 3px;
+}
+
+.scan-lines {
+  position: relative;
+}
+.scan-lines::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background: repeating-linear-gradient(
+    0deg,
+    rgba(0, 0, 0, 0.06) 0,
+    rgba(0, 0, 0, 0.06) 1px,
+    transparent 1px,
+    transparent 3px
+  );
+  mix-blend-mode: multiply;
+}
+
+.prose-stephen h2 {
+  font-family: var(--font-display);
+  text-transform: uppercase;
+  font-size: 1.875rem;
+  line-height: 1;
+  margin-top: 2.5rem;
+  margin-bottom: 0.75rem;
+  letter-spacing: -0.01em;
+}
+.prose-stephen p {
+  font-size: 1rem;
+  line-height: 1.7;
+  margin-bottom: 1rem;
+}
+.prose-stephen a {
+  text-decoration: underline;
+}
+.prose-stephen a:hover {
+  color: var(--color-hazard);
+}
