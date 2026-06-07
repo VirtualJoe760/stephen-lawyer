@@ -9,6 +9,7 @@ import { StorefrontChrome } from "@/components/layout/StorefrontChrome";
 import { SITE_URL } from "@/lib/utils";
 import { JsonLd } from "@/components/seo/json-ld";
 import { organizationSchema, websiteSchema } from "@/lib/seo";
+import { PWARegister } from "@/components/pwa-register";
 
 const display = Anton({ weight: "400", subsets: ["latin"], variable: "--font-anton", display: "swap" });
 const sans = Inter({ subsets: ["latin"], variable: "--font-inter", display: "swap" });
@@ -78,6 +79,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
     <html lang="en" className={`${display.variable} ${sans.variable} ${mono.variable}`}>
       <body className="min-h-screen flex flex-col bg-bone text-ink">
         <JsonLd data={[organizationSchema(), websiteSchema()]} />
+        <PWARegister />
         <StorefrontChrome
           ticker={<NewsTicker />}
           header={<Header />}

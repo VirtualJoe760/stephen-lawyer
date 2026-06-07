@@ -1,8 +1,10 @@
 import Link from "next/link";
 import { auth } from "@/lib/auth";
+import { isAdmin } from "@/lib/admin/auth";
 
 export default async function AccountHome() {
   const session = await auth();
+  const admin = await isAdmin();
   return (
     <div className="grid md:grid-cols-2 gap-8">
       <section className="border-2 border-ink p-6">
@@ -15,6 +17,16 @@ export default async function AccountHome() {
       <section className="border-2 border-ink p-6">
         <h2 className="wordmark text-2xl mb-4">Quick links</h2>
         <ul className="space-y-2 font-mono text-sm uppercase tracking-widest">
+          {admin ? (
+            <li>
+              <Link
+                href="/admin"
+                className="inline-block bg-hazard px-3 py-2 text-bone transition-opacity hover:opacity-90"
+              >
+                Admin · Design Generator →
+              </Link>
+            </li>
+          ) : null}
           <li><Link href="/account/orders" className="hover:text-hazard">Order history →</Link></li>
           <li><Link href="/account/addresses" className="hover:text-hazard">Saved addresses →</Link></li>
           <li><Link href="/shop" className="hover:text-hazard">Keep shopping →</Link></li>

@@ -6,6 +6,8 @@ export default function manifest(): MetadataRoute.Manifest {
     name: BRAND_NAME,
     short_name: "SL",
     description: BRAND_DESCRIPTION,
+    id: "/",
+    scope: "/",
     start_url: "/",
     display: "standalone",
     background_color: "#0F0F0F",
