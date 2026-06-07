@@ -17,17 +17,27 @@ export function DesignsHistoryBar({
   }
   return (
     <div className="flex gap-2 overflow-x-auto">
-      {designs.map((d) => (
-        <button
-          key={d.id}
-          onClick={() => onAdd(d)}
-          title={d.prompt}
-          className="h-12 w-12 shrink-0 overflow-hidden rounded border border-bone/15 hover:border-hazard"
-        >
-          {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img src={d.thumbUrl} alt={d.prompt} className="h-full w-full object-cover" draggable={false} />
-        </button>
-      ))}
+      {designs.map((d) =>
+        d.pending ? (
+          <div
+            key={d.id}
+            title={d.prompt}
+            className="flex h-12 w-12 shrink-0 animate-pulse items-center justify-center rounded border border-bone/15 bg-bone/10 text-[8px] font-mono uppercase text-bone/40"
+          >
+            …
+          </div>
+        ) : (
+          <button
+            key={d.id}
+            onClick={() => onAdd(d)}
+            title={d.prompt}
+            className="h-12 w-12 shrink-0 overflow-hidden rounded border border-bone/15 hover:border-hazard"
+          >
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img src={d.thumbUrl} alt={d.prompt} className="h-full w-full object-cover" draggable={false} />
+          </button>
+        ),
+      )}
     </div>
   );
 }

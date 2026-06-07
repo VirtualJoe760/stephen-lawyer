@@ -35,6 +35,7 @@ export interface DesignRow {
   thumbUrl: string;
   url: string;
   prompt: string;
+  pending?: boolean;
 }
 export interface CatalogueRow {
   id: string;
@@ -95,6 +96,7 @@ function flowNodeToRow(n: Node): CanvasNodeRow {
 function DesignerInner({ catalogue, catalogues, initialNodes, designs }: Props) {
   const rf = useReactFlow();
   const [nodes, setNodes] = useState<Node[]>(() => initialNodes.map((r) => rowToFlowNode(r, designs)));
+  const [designList, setDesignList] = useState<DesignRow[]>(designs);
   const saveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const persist = useCallback(
@@ -165,15 +167,41 @@ function DesignerInner({ catalogue, catalogues, initialNodes, designs }: Props) 
     [centerPosition, persist],
   );
 
-  // Generation is wired in Phase 3.
-  const onPrompt = useCallback(async (_prompt: string) => {}, []);
+  // Generate a design from a chat prompt → optimistic skeleton in the history
+  // bar, replaced with the real thumbnail when the API returns.
+  const onPrompt = useCallback(
+    async (prompt: string) => {
+      const tempId = crypto.randomUUID();
+      setDesignList((cur) => [{ id: tempId, thumbUrl: "", url: "", prompt, pending: true }, ...cur]);
+      try {
+        const res = await fetch("/api/admin/designs", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ catalogueId: catalogue.id, prompt }),
+        });
+        const data = (await res.json().catch(() => ({}))) as {
+          design?: { id: string; thumbUrl: string; url: string; prompt: string };
+          error?: string;
+        };
+        if (!res.ok || !data.design) throw new Error(data.error ?? "Generation failed");
+        const real = data.design;
+        setDesignList((cur) => cur.map((d) => (d.id === tempId ? { ...real } : d)));
+      } catch (e) {
+        setDesignList((cur) => cur.filter((d) => d.id !== tempId));
+        if (typeof window !== "undefined") {
+          window.alert(e instanceof Error ? e.message : "Generation failed");
+        }
+      }
+    },
+    [catalogue.id],
+  );
 
   return (
     <div className="flex h-[100dvh] flex-col bg-ink text-bone">
       <header className="flex items-center gap-3 border-b border-bone/10 px-3 py-2">
         <CatalogueSwitcher current={catalogue} catalogues={catalogues} />
         <div className="min-w-0 flex-1">
-          <DesignsHistoryBar designs={designs} onAdd={addDesign} />
+          <DesignsHistoryBar designs={designList} onAdd={addDesign} />
         </div>
       </header>
 
