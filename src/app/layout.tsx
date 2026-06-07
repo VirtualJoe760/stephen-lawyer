@@ -5,6 +5,7 @@ import { NewsTicker } from "@/components/layout/news-ticker";
 import { Header } from "@/components/layout/header";
 import { Footer } from "@/components/layout/footer";
 import { CartDrawer } from "@/components/cart/cart-drawer";
+import { StorefrontChrome } from "@/components/layout/StorefrontChrome";
 import { SITE_URL } from "@/lib/utils";
 import { JsonLd } from "@/components/seo/json-ld";
 import { organizationSchema, websiteSchema } from "@/lib/seo";
@@ -77,11 +78,14 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
     <html lang="en" className={`${display.variable} ${sans.variable} ${mono.variable}`}>
       <body className="min-h-screen flex flex-col bg-bone text-ink">
         <JsonLd data={[organizationSchema(), websiteSchema()]} />
-        <NewsTicker />
-        <Header />
-        <main className="flex-1">{children}</main>
-        <Footer />
-        <CartDrawer />
+        <StorefrontChrome
+          ticker={<NewsTicker />}
+          header={<Header />}
+          footer={<Footer />}
+          drawer={<CartDrawer />}
+        >
+          {children}
+        </StorefrontChrome>
       </body>
     </html>
   );
