@@ -1,5 +1,6 @@
 "use client";
 import { useRef, useState } from "react";
+import { TextDialog } from "./TextDialog";
 
 function useChat(onSubmit: (p: string) => void | Promise<void>) {
   const [prompt, setPrompt] = useState("");
@@ -33,10 +34,11 @@ function DesignActions({
   onText,
 }: {
   onUpload: (dataUrl: string, name: string) => void | Promise<void>;
-  onText: (text: string) => void | Promise<void>;
+  onText: (text: string, style: string) => void | Promise<void>;
 }) {
   const fileRef = useRef<HTMLInputElement>(null);
   const [busy, setBusy] = useState(false);
+  const [textOpen, setTextOpen] = useState(false);
 
   async function handleFile(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0];
@@ -51,11 +53,6 @@ function DesignActions({
     }
   }
 
-  function handleText() {
-    const text = typeof window !== "undefined" ? window.prompt("Text to turn into a design graphic:") : null;
-    if (text && text.trim()) onText(text.trim());
-  }
-
   return (
     <div className="flex gap-2">
       <input ref={fileRef} type="file" accept="image/*" onChange={handleFile} className="hidden" />
@@ -67,11 +64,20 @@ function DesignActions({
         {busy ? "Uploading…" : "↑ Upload"}
       </button>
       <button
-        onClick={handleText}
+        onClick={() => setTextOpen(true)}
         className="flex-1 rounded border border-bone/20 px-2 py-2 text-[11px] font-mono uppercase tracking-widest text-bone/70 hover:border-hazard hover:text-bone"
       >
         Aa Text
       </button>
+      {textOpen ? (
+        <TextDialog
+          onCancel={() => setTextOpen(false)}
+          onConfirm={(text, style) => {
+            setTextOpen(false);
+            onText(text, style);
+          }}
+        />
+      ) : null}
     </div>
   );
 }
@@ -84,7 +90,7 @@ function SideForm({
 }: {
   onSubmit: (p: string) => void | Promise<void>;
   onUpload: (dataUrl: string, name: string) => void | Promise<void>;
-  onText: (text: string) => void | Promise<void>;
+  onText: (text: string, style: string) => void | Promise<void>;
 }) {
   const { prompt, setPrompt, pending, submit } = useChat(onSubmit);
   return (
@@ -132,7 +138,7 @@ function MobileChat({
 }: {
   onSubmit: (p: string) => void | Promise<void>;
   onUpload: (dataUrl: string, name: string) => void | Promise<void>;
-  onText: (text: string) => void | Promise<void>;
+  onText: (text: string, style: string) => void | Promise<void>;
   onClose: () => void;
 }) {
   const { prompt, setPrompt, pending, submit } = useChat(onSubmit);
@@ -185,7 +191,7 @@ export function ChatPanel({
 }: {
   onSubmit: (p: string) => void | Promise<void>;
   onUpload: (dataUrl: string, name: string) => void | Promise<void>;
-  onText: (text: string) => void | Promise<void>;
+  onText: (text: string, style: string) => void | Promise<void>;
   variant?: "side" | "mobile";
 }) {
   const [open, setOpen] = useState(false);

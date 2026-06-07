@@ -2,7 +2,7 @@ import { notFound } from "next/navigation";
 import { asc, desc, eq } from "drizzle-orm";
 import { requireAdminPage } from "@/lib/admin/auth";
 import { db } from "@/lib/db";
-import { catalogues, canvasNodes, designs } from "@/db/schema";
+import { catalogues, canvasNodes, designs, compositions } from "@/db/schema";
 import { getCatalogBlanks, type CatalogBlank } from "@/lib/printful/catalog";
 import DesignerCanvas from "@/components/admin/DesignerCanvas";
 
@@ -32,10 +32,11 @@ export default async function DesignerCanvasPage({
     blanks = [];
   }
 
-  const [allCatalogues, nodeRows, designRows] = await Promise.all([
+  const [allCatalogues, nodeRows, designRows, compositionRows] = await Promise.all([
     db.select().from(catalogues).orderBy(asc(catalogues.sortOrder), asc(catalogues.createdAt)),
     db.select().from(canvasNodes).where(eq(canvasNodes.catalogueId, cat.id)),
     db.select().from(designs).where(eq(designs.catalogueId, cat.id)).orderBy(desc(designs.createdAt)),
+    db.select().from(compositions).where(eq(compositions.catalogueId, cat.id)),
   ]);
 
   return (
@@ -56,6 +57,11 @@ export default async function DesignerCanvasPage({
         thumbUrl: d.thumbUrl,
         url: d.url,
         prompt: d.prompt,
+      }))}
+      compositions={compositionRows.map((c) => ({
+        id: c.id,
+        status: c.status,
+        previewUrl: c.previewUrl,
       }))}
       blanks={blanks}
     />

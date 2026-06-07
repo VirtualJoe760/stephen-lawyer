@@ -50,12 +50,18 @@ export interface CatalogueRow {
   name: string;
   slug: string;
 }
+export interface CompositionRow {
+  id: string;
+  status: "generating" | "draft" | "approved" | "published" | "failed";
+  previewUrl: string | null;
+}
 
 interface Props {
   catalogue: CatalogueRow;
   catalogues: CatalogueRow[];
   initialNodes: CanvasNodeRow[];
   designs: DesignRow[];
+  compositions: CompositionRow[];
   blanks: CatalogBlank[];
 }
 
@@ -96,6 +102,7 @@ function rowToFlowNode(
   r: CanvasNodeRow,
   designs: DesignRow[],
   blanksById: Map<string, CatalogBlank>,
+  compositionsById: Map<string, CompositionRow>,
 ): Node {
   const position = { x: r.x, y: r.y };
   if (r.kind === "design") {
@@ -109,12 +116,13 @@ function rowToFlowNode(
     };
   }
   if (r.kind === "composition") {
+    const c = compositionsById.get(r.refId);
     return {
       id: r.id,
       type: "composition",
       position,
       ...SIZES.composition,
-      data: { compositionId: r.refId, status: "draft" },
+      data: { compositionId: r.refId, status: c?.status ?? "draft", previewUrl: c?.previewUrl ?? null },
     };
   }
   if (r.kind === "label") {
@@ -151,14 +159,18 @@ function flowNodeToRow(n: Node): CanvasNodeRow {
   };
 }
 
-function DesignerInner({ catalogue, catalogues, initialNodes, designs, blanks }: Props) {
+function DesignerInner({ catalogue, catalogues, initialNodes, designs, compositions, blanks }: Props) {
   const rf = useReactFlow();
   const blanksById = useMemo(() => new Map(blanks.map((b) => [String(b.id), b])), [blanks]);
+  const compositionsById = useMemo(
+    () => new Map(compositions.map((c) => [c.id, c])),
+    [compositions],
+  );
   const [nodes, setNodes] = useState<Node[]>(() =>
     initialNodes
       // Drop legacy "+"/"=" separator labels saved by earlier versions.
       .filter((r) => !(r.kind === "label" && (r.refId === "+" || r.refId === "=")))
-      .map((r) => rowToFlowNode(r, designs, blanksById)),
+      .map((r) => rowToFlowNode(r, designs, blanksById, compositionsById)),
   );
   const [designList, setDesignList] = useState<DesignRow[]>(designs);
   const [modalCompId, setModalCompId] = useState<string | null>(null);
@@ -313,7 +325,8 @@ function DesignerInner({ catalogue, catalogues, initialNodes, designs, blanks }:
     [catalogue.id, persist, nodes],
   );
 
-  // Drag a design onto a template → open the placement modal (where/all-over).
+  // Drag a design onto a template → placement modal (where/all-over).
+  // Drag a design onto another design → merge modal (collision prompt).
   const onNodeDragStop = useCallback(
     (_e: unknown, dragged: Node) => {
       if (dragged.type !== "design") return;
@@ -330,6 +343,16 @@ function DesignerInner({ catalogue, catalogues, initialNodes, designs, blanks }:
             nodeId: tpl.id,
             position: { x: tpl.position.x, y: tpl.position.y },
           },
+        });
+        return;
+      }
+      const other = all.find(
+        (n) => n.type === "design" && n.id !== dragged.id && overlaps(dBox, boxOf(n)),
+      );
+      if (other) {
+        setMergeTarget({
+          a: { designId: str(dragged.data, "designId"), thumbUrl: str(dragged.data, "thumbUrl") || undefined },
+          b: { designId: str(other.data, "designId"), thumbUrl: str(other.data, "thumbUrl") || undefined },
         });
       }
     },
@@ -434,12 +457,13 @@ function DesignerInner({ catalogue, catalogues, initialNodes, designs, blanks }:
     [catalogue.id, runDesignJob],
   );
 
-  // "Aa Text" → generate a lettering graphic from the typed text.
+  // "Aa Text" → generate a lettering graphic from the typed text (+ optional style).
   const onText = useCallback(
-    (text: string) =>
+    (text: string, style: string) =>
       onPrompt(
-        `The words "${text}" as a bold, high-contrast lettering graphic with clean typography, ` +
-          "centered, transparent background, suitable for printing on apparel.",
+        `The words "${text}" as a bold, high-contrast lettering graphic with clean typography` +
+          (style ? `, ${style} style` : "") +
+          ", centered, transparent background, suitable for printing on apparel.",
       ),
     [onPrompt],
   );
@@ -520,6 +544,7 @@ function DesignerInner({ catalogue, catalogues, initialNodes, designs, blanks }:
             onNodeClick={onNodeClick}
             nodeTypes={nodeTypes}
             nodesConnectable={false}
+            multiSelectionKeyCode={["Control", "Meta"]}
             selectionOnDrag={toolMode === "box"}
             panOnDrag={toolMode === "box" ? [1, 2] : true}
             fitView
