@@ -3,6 +3,7 @@ import { asc, desc, eq } from "drizzle-orm";
 import { requireAdminPage } from "@/lib/admin/auth";
 import { db } from "@/lib/db";
 import { catalogues, canvasNodes, designs } from "@/db/schema";
+import { getCatalogBlanks, type CatalogBlank } from "@/lib/printful/catalog";
 import DesignerCanvas from "@/components/admin/DesignerCanvas";
 
 export const dynamic = "force-dynamic";
@@ -21,6 +22,15 @@ export default async function DesignerCanvasPage({
     .where(eq(catalogues.slug, catalogueSlug))
     .limit(1);
   if (!cat) notFound();
+
+  // Full Printful catalog for the blank picker (cached server-side). Degrade to
+  // an empty list if Printful is unreachable so the canvas still loads.
+  let blanks: CatalogBlank[] = [];
+  try {
+    blanks = await getCatalogBlanks();
+  } catch {
+    blanks = [];
+  }
 
   const [allCatalogues, nodeRows, designRows] = await Promise.all([
     db.select().from(catalogues).orderBy(asc(catalogues.sortOrder), asc(catalogues.createdAt)),
@@ -47,6 +57,7 @@ export default async function DesignerCanvasPage({
         url: d.url,
         prompt: d.prompt,
       }))}
+      blanks={blanks}
     />
   );
 }

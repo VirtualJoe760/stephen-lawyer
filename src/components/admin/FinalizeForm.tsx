@@ -1,5 +1,5 @@
 "use client";
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 
 export interface FinalizeVariant {
@@ -20,34 +20,52 @@ interface Props {
   variantsError: string | null;
 }
 
-const MARKUP = 2; // default retail = 2× Printful base cost
-
 export function FinalizeForm(props: Props) {
   const router = useRouter();
   const [name, setName] = useState("");
   const [description, setDescription] = useState("");
-  const [placement, setPlacement] = useState(props.defaultPlacement);
-  const [rows, setRows] = useState<Record<number, { on: boolean; priceCents: number }>>(() => {
-    const m: Record<number, { on: boolean; priceCents: number }> = {};
-    for (const v of props.variants) m[v.id] = { on: true, priceCents: v.priceCents * MARKUP };
-    return m;
-  });
+  const [placement, setPlacement] = useState(props.defaultPlacement || props.placements[0] || "front");
+
+  // Group variants by color so large products (hundreds of variants) stay usable.
+  const colorGroups = useMemo(() => {
+    const m = new Map<string, FinalizeVariant[]>();
+    for (const v of props.variants) {
+      const key = v.color || "Default";
+      const arr = m.get(key);
+      if (arr) arr.push(v);
+      else m.set(key, [v]);
+    }
+    return [...m.entries()].map(([color, vs]) => ({ color, vs }));
+  }, [props.variants]);
+
+  const maxBaseCents = useMemo(
+    () => props.variants.reduce((m, v) => Math.max(m, v.priceCents), 0),
+    [props.variants],
+  );
+  const [selectedColors, setSelectedColors] = useState<Set<string>>(new Set());
+  // Single retail price applied to all selected variants (default ~2x base).
+  const [priceCents, setPriceCents] = useState<number>(() => (maxBaseCents ? maxBaseCents * 2 : 2999));
   const [err, setErr] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
 
+  const selectedVariants = useMemo(
+    () => props.variants.filter((v) => selectedColors.has(v.color || "Default")),
+    [props.variants, selectedColors],
+  );
+
+  function toggleColor(c: string) {
+    setSelectedColors((prev) => {
+      const n = new Set(prev);
+      if (n.has(c)) n.delete(c);
+      else n.add(c);
+      return n;
+    });
+  }
+
   async function publish() {
     setErr(null);
-    if (!name.trim()) {
-      setErr("Product name is required");
-      return;
-    }
-    const variants = Object.entries(rows)
-      .filter(([, s]) => s.on)
-      .map(([id, s]) => ({ printfulVariantId: Number(id), retailPriceCents: s.priceCents }));
-    if (!variants.length) {
-      setErr("Select at least one variant");
-      return;
-    }
+    if (!name.trim()) return setErr("Product name is required");
+    if (!selectedVariants.length) return setErr("Select at least one color");
     setBusy(true);
     try {
       const res = await fetch(`/api/admin/compositions/${props.compositionId}/publish`, {
@@ -57,14 +75,11 @@ export function FinalizeForm(props: Props) {
           name: name.trim(),
           description: description.trim() || undefined,
           placement,
-          variants,
+          variants: selectedVariants.map((v) => ({ printfulVariantId: v.id, retailPriceCents: priceCents })),
         }),
       });
       const data = (await res.json().catch(() => ({}))) as { ok?: boolean; error?: string; warning?: string };
-      if (!res.ok || !data.ok) {
-        setErr(data.error ?? "Publish failed");
-        return;
-      }
+      if (!res.ok || !data.ok) return setErr(data.error ?? "Publish failed");
       if (data.warning) window.alert(data.warning);
       router.push("/shop");
     } finally {
@@ -105,59 +120,63 @@ export function FinalizeForm(props: Props) {
             className="mt-1 w-full resize-none rounded border border-bone/20 bg-ink px-3 py-2 text-sm focus:border-hazard focus:outline-none"
           />
         </div>
-        <div>
-          <label className="block text-[11px] font-mono uppercase tracking-widest text-bone/50">Placement</label>
-          <select
-            value={placement}
-            onChange={(e) => setPlacement(e.target.value)}
-            className="mt-1 rounded border border-bone/20 bg-ink px-3 py-2 text-sm focus:border-hazard focus:outline-none"
-          >
-            {props.placements.map((p) => (
-              <option key={p} value={p}>
-                {p.replace(/_/g, " ")}
-              </option>
-            ))}
-          </select>
+        <div className="flex flex-wrap gap-4">
+          <div>
+            <label className="block text-[11px] font-mono uppercase tracking-widest text-bone/50">Placement</label>
+            <select
+              value={placement}
+              onChange={(e) => setPlacement(e.target.value)}
+              className="mt-1 rounded border border-bone/20 bg-ink px-3 py-2 text-sm focus:border-hazard focus:outline-none"
+            >
+              {props.placements.map((p) => (
+                <option key={p} value={p}>
+                  {p.replace(/_/g, " ")}
+                </option>
+              ))}
+            </select>
+          </div>
+          <div>
+            <label className="block text-[11px] font-mono uppercase tracking-widest text-bone/50">
+              Retail price (all sizes)
+            </label>
+            <div className="mt-1 flex items-center gap-1">
+              <span className="text-bone/40">$</span>
+              <input
+                type="number"
+                step="0.01"
+                value={(priceCents / 100).toFixed(2)}
+                onChange={(e) => setPriceCents(Math.round((Number(e.target.value) || 0) * 100))}
+                className="w-24 rounded border border-bone/20 bg-ink px-2 py-2 text-right text-sm focus:border-hazard focus:outline-none"
+              />
+            </div>
+          </div>
         </div>
 
         <div>
-          <label className="block text-[11px] font-mono uppercase tracking-widest text-bone/50">Variants</label>
-          {props.variants.length ? (
-            <div className="mt-2 divide-y divide-bone/10 rounded border border-bone/15">
-              {props.variants.map((v) => {
-                const row = rows[v.id];
+          <label className="block text-[11px] font-mono uppercase tracking-widest text-bone/50">
+            Colors ({selectedVariants.length} variants selected)
+          </label>
+          {colorGroups.length ? (
+            <div className="mt-2 grid max-h-72 grid-cols-2 gap-1 overflow-y-auto rounded border border-bone/15 p-2 sm:grid-cols-3">
+              {colorGroups.map(({ color, vs }) => {
+                const on = selectedColors.has(color);
                 return (
-                  <div key={v.id} className="flex items-center gap-3 px-3 py-2 text-sm">
-                    <input
-                      type="checkbox"
-                      checked={row.on}
-                      onChange={(e) => setRows((r) => ({ ...r, [v.id]: { ...r[v.id], on: e.target.checked } }))}
-                    />
-                    <span className="min-w-0 flex-1 truncate">
-                      {v.color} / {v.size}
-                      <span className="ml-2 text-bone/40">base ${(v.priceCents / 100).toFixed(2)}</span>
-                    </span>
-                    <span className="text-bone/40">$</span>
-                    <input
-                      type="number"
-                      step="0.01"
-                      value={(row.priceCents / 100).toFixed(2)}
-                      onChange={(e) =>
-                        setRows((r) => ({
-                          ...r,
-                          [v.id]: { ...r[v.id], priceCents: Math.round((Number(e.target.value) || 0) * 100) },
-                        }))
-                      }
-                      className="w-20 rounded border border-bone/20 bg-ink px-2 py-1 text-right focus:border-hazard focus:outline-none"
-                    />
-                  </div>
+                  <button
+                    key={color}
+                    onClick={() => toggleColor(color)}
+                    className={`flex items-center justify-between rounded border px-2 py-1 text-left text-xs ${
+                      on ? "border-hazard text-bone" : "border-bone/15 text-bone/60"
+                    }`}
+                  >
+                    <span className="truncate">{color}</span>
+                    <span className="ml-1 shrink-0 text-bone/30">{vs.length}</span>
+                  </button>
                 );
               })}
             </div>
           ) : (
             <p className="mt-2 rounded border border-hazard/40 bg-hazard/10 px-3 py-2 text-xs text-hazard">
-              {props.variantsError ??
-                "No variants available. Set this template's Printful variant IDs (templates.ts) to enable publishing."}
+              {props.variantsError ?? "No variants available for this product."}
             </p>
           )}
         </div>
@@ -166,10 +185,10 @@ export function FinalizeForm(props: Props) {
 
         <button
           onClick={publish}
-          disabled={busy || !props.variants.length}
+          disabled={busy || !colorGroups.length}
           className="w-full rounded bg-hazard px-4 py-3 text-sm font-bold uppercase tracking-widest text-bone disabled:opacity-50"
         >
-          {busy ? "Publishing…" : "Publish to Printful"}
+          {busy ? "Publishing…" : `Publish to Printful (${selectedVariants.length} variants)`}
         </button>
       </div>
     </div>

@@ -1,14 +1,12 @@
 "use client";
 import { memo } from "react";
 import { useReactFlow, type NodeProps } from "@xyflow/react";
-import { getTemplate } from "@/lib/printful/templates";
 
-export type TemplateNodeData = { templateKey: string };
+export type TemplateNodeData = { productId: string; name?: string; image?: string };
 
 export const TemplateNode = memo(function TemplateNode({ id, data, selected }: NodeProps) {
   const { deleteElements } = useReactFlow();
-  const key = (data as TemplateNodeData).templateKey ?? "";
-  const t = getTemplate(key);
+  const d = data as TemplateNodeData;
   return (
     <div
       className={`relative w-40 select-none rounded-md border bg-ink-soft p-3 text-bone shadow-lg ${
@@ -27,14 +25,14 @@ export const TemplateNode = memo(function TemplateNode({ id, data, selected }: N
         ×
       </button>
       <div className="flex aspect-square items-center justify-center overflow-hidden rounded bg-bone/5">
-        {t?.mockupUrl ? (
+        {d.image ? (
           // eslint-disable-next-line @next/next/no-img-element
-          <img src={t.mockupUrl} alt={t.name} className="h-full w-full object-contain" draggable={false} />
+          <img src={d.image} alt={d.name ?? "blank"} className="h-full w-full object-contain" draggable={false} />
         ) : (
-          <span className="text-[10px] font-mono uppercase tracking-widest text-bone/40">Template</span>
+          <span className="text-[10px] font-mono uppercase tracking-widest text-bone/40">Blank</span>
         )}
       </div>
-      <p className="mt-2 truncate text-xs font-mono uppercase tracking-wide">{t?.name ?? key}</p>
+      <p className="mt-2 truncate text-xs font-mono uppercase tracking-wide">{d.name ?? d.productId}</p>
     </div>
   );
 });

@@ -1,6 +1,6 @@
 "use client";
 import Link from "next/link";
-import { useCallback, useRef, useState } from "react";
+import { useCallback, useMemo, useRef, useState } from "react";
 import {
   ReactFlow,
   ReactFlowProvider,
@@ -14,6 +14,7 @@ import {
   type NodeTypes,
 } from "@xyflow/react";
 import "@xyflow/react/dist/style.css";
+import type { CatalogBlank } from "@/lib/printful/catalog";
 import { TemplateNode } from "./nodes/TemplateNode";
 import { DesignNode } from "./nodes/DesignNode";
 import { CompositionNode } from "./nodes/CompositionNode";
@@ -50,6 +51,7 @@ interface Props {
   catalogues: CatalogueRow[];
   initialNodes: CanvasNodeRow[];
   designs: DesignRow[];
+  blanks: CatalogBlank[];
 }
 
 const nodeTypes: NodeTypes = {
@@ -69,19 +71,20 @@ interface Box {
   w: number;
   h: number;
 }
-function boxOf(n: Node): Box {
-  return {
-    x: n.position.x,
-    y: n.position.y,
-    w: n.measured?.width ?? 160,
-    h: n.measured?.height ?? 160,
-  };
-}
-function overlaps(a: Box, b: Box): boolean {
-  return a.x < b.x + b.w && a.x + a.w > b.x && a.y < b.y + b.h && a.y + a.h > b.y;
-}
+const boxOf = (n: Node): Box => ({
+  x: n.position.x,
+  y: n.position.y,
+  w: n.measured?.width ?? 160,
+  h: n.measured?.height ?? 160,
+});
+const overlaps = (a: Box, b: Box) =>
+  a.x < b.x + b.w && a.x + a.w > b.x && a.y < b.y + b.h && a.y + a.h > b.y;
 
-function rowToFlowNode(r: CanvasNodeRow, designs: DesignRow[]): Node {
+function rowToFlowNode(
+  r: CanvasNodeRow,
+  designs: DesignRow[],
+  blanksById: Map<string, CatalogBlank>,
+): Node {
   const position = { x: r.x, y: r.y };
   if (r.kind === "design") {
     const d = designs.find((x) => x.id === r.refId);
@@ -95,7 +98,8 @@ function rowToFlowNode(r: CanvasNodeRow, designs: DesignRow[]): Node {
   if (r.kind === "composition") {
     return { id: r.id, type: "composition", position, data: { compositionId: r.refId, status: "draft" } };
   }
-  return { id: r.id, type: "template", position, data: { templateKey: r.refId } };
+  const b = blanksById.get(r.refId);
+  return { id: r.id, type: "template", position, data: { productId: r.refId, name: b?.name, image: b?.image } };
 }
 
 function flowNodeToRow(n: Node): CanvasNodeRow {
@@ -105,7 +109,7 @@ function flowNodeToRow(n: Node): CanvasNodeRow {
       ? str(n.data, "designId")
       : kind === "composition"
         ? str(n.data, "compositionId")
-        : str(n.data, "templateKey");
+        : str(n.data, "productId");
   return {
     id: n.id,
     kind,
@@ -117,9 +121,12 @@ function flowNodeToRow(n: Node): CanvasNodeRow {
   };
 }
 
-function DesignerInner({ catalogue, catalogues, initialNodes, designs }: Props) {
+function DesignerInner({ catalogue, catalogues, initialNodes, designs, blanks }: Props) {
   const rf = useReactFlow();
-  const [nodes, setNodes] = useState<Node[]>(() => initialNodes.map((r) => rowToFlowNode(r, designs)));
+  const blanksById = useMemo(() => new Map(blanks.map((b) => [String(b.id), b])), [blanks]);
+  const [nodes, setNodes] = useState<Node[]>(() =>
+    initialNodes.map((r) => rowToFlowNode(r, designs, blanksById)),
+  );
   const [designList, setDesignList] = useState<DesignRow[]>(designs);
   const [modalCompId, setModalCompId] = useState<string | null>(null);
   const saveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -128,7 +135,7 @@ function DesignerInner({ catalogue, catalogues, initialNodes, designs }: Props) 
     (next: Node[]) => {
       if (saveTimer.current) clearTimeout(saveTimer.current);
       saveTimer.current = setTimeout(() => {
-        const rows = next.map(flowNodeToRow).filter((r) => r.refId); // skip in-flight skeletons
+        const rows = next.map(flowNodeToRow).filter((r) => r.refId);
         fetch(`/api/admin/canvas/${catalogue.slug}`, {
           method: "PUT",
           headers: { "Content-Type": "application/json" },
@@ -148,12 +155,12 @@ function DesignerInner({ catalogue, catalogues, initialNodes, designs }: Props) 
   }, [rf]);
 
   const addTemplate = useCallback(
-    (key: string) => {
+    (blank: CatalogBlank) => {
       const node: Node = {
         id: crypto.randomUUID(),
         type: "template",
         position: centerPosition(),
-        data: { templateKey: key },
+        data: { productId: String(blank.id), name: blank.name, image: blank.image },
       };
       setNodes((cur) => {
         const next = [...cur, node];
@@ -192,10 +199,9 @@ function DesignerInner({ catalogue, catalogues, initialNodes, designs }: Props) 
     [persist],
   );
 
-  // Drag a DesignNode onto a TemplateNode → fire a composition.
   const createComposition = useCallback(
-    async (designId: string, templateKey: string, position: { x: number; y: number }) => {
-      if (!designId || !templateKey) return;
+    async (designId: string, productId: string, position: { x: number; y: number }) => {
+      if (!designId || !productId) return;
       const tempId = crypto.randomUUID();
       const skeleton: Node = {
         id: tempId,
@@ -211,7 +217,7 @@ function DesignerInner({ catalogue, catalogues, initialNodes, designs }: Props) 
           body: JSON.stringify({
             catalogueId: catalogue.id,
             designId,
-            templateKey,
+            templateKey: productId,
             x: Math.round(position.x),
             y: Math.round(position.y),
           }),
@@ -248,7 +254,7 @@ function DesignerInner({ catalogue, catalogues, initialNodes, designs }: Props) 
       const dBox = boxOf(dragged);
       const tpl = all.find((n) => n.type === "template" && overlaps(dBox, boxOf(n)));
       if (tpl) {
-        createComposition(str(dragged.data, "designId"), str(tpl.data, "templateKey"), {
+        createComposition(str(dragged.data, "designId"), str(tpl.data, "productId"), {
           x: dragged.position.x + 70,
           y: dragged.position.y + 70,
         });
@@ -259,8 +265,8 @@ function DesignerInner({ catalogue, catalogues, initialNodes, designs }: Props) 
 
   const onNodeClick = useCallback((_e: unknown, node: Node) => {
     if (node.type === "composition") {
-      const id = str(node.data, "compositionId");
-      if (id) setModalCompId(id);
+      const compId = str(node.data, "compositionId");
+      if (compId) setModalCompId(compId);
     }
   }, []);
 
@@ -275,7 +281,6 @@ function DesignerInner({ catalogue, catalogues, initialNodes, designs }: Props) 
     [persist],
   );
 
-  // Generate a design from a chat prompt → optimistic skeleton, replaced on success.
   const onPrompt = useCallback(
     async (prompt: string) => {
       const tempId = crypto.randomUUID();
@@ -325,8 +330,8 @@ function DesignerInner({ catalogue, catalogues, initialNodes, designs }: Props) 
       </header>
 
       <div className="relative flex min-h-0 flex-1">
-        <aside className="hidden w-44 shrink-0 overflow-y-auto border-r border-bone/10 p-2 lg:block">
-          <TemplatesRail onAdd={addTemplate} />
+        <aside className="hidden w-48 shrink-0 overflow-y-auto border-r border-bone/10 p-2 lg:block">
+          <TemplatesRail blanks={blanks} onAdd={addTemplate} />
         </aside>
 
         <div id="designer-flow" className="relative min-w-0 flex-1">
@@ -353,8 +358,8 @@ function DesignerInner({ catalogue, catalogues, initialNodes, designs }: Props) 
       </div>
 
       {/* Mobile templates dock */}
-      <div className="border-t border-bone/10 p-2 lg:hidden">
-        <TemplatesRail onAdd={addTemplate} orientation="horizontal" />
+      <div className="max-h-44 overflow-y-auto border-t border-bone/10 p-2 lg:hidden">
+        <TemplatesRail blanks={blanks} onAdd={addTemplate} orientation="horizontal" />
       </div>
 
       {/* Mobile chat */}

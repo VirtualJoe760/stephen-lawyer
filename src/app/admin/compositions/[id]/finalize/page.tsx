@@ -3,7 +3,6 @@ import { eq } from "drizzle-orm";
 import { requireAdminPage } from "@/lib/admin/auth";
 import { db } from "@/lib/db";
 import { compositions } from "@/db/schema";
-import { getTemplate } from "@/lib/printful/templates";
 import { getCatalogProduct } from "@/lib/printful/client";
 import { FinalizeForm, type FinalizeVariant } from "@/components/admin/FinalizeForm";
 
@@ -16,39 +15,36 @@ export default async function FinalizePage({ params }: { params: Promise<{ id: s
   const [comp] = await db.select().from(compositions).where(eq(compositions.id, id)).limit(1);
   if (!comp) notFound();
 
-  const tpl = getTemplate(comp.templateKey);
-
-  // Fetch variant options from Printful (best-effort: needs PRINTFUL_API_KEY +
-  // configured variantIds). On failure we surface guidance instead of blocking.
+  // comp.templateKey holds the Printful catalog product id. Fetch all variants;
+  // the form groups them by color so big products stay manageable.
+  const productId = Number(comp.templateKey);
   let variants: FinalizeVariant[] = [];
   let variantsError: string | null = null;
-  if (tpl && tpl.printfulProductId && tpl.variantIds.length) {
+  let templateName = comp.templateKey;
+  if (Number.isFinite(productId)) {
     try {
-      // One catalog call, filtered to this template's curated variant IDs.
-      const { variants: all } = await getCatalogProduct(tpl.printfulProductId);
-      const want = new Set(tpl.variantIds);
-      variants = all
-        .filter((v) => want.has(v.id))
-        .map((v) => ({
-          id: v.id,
-          name: v.name,
-          size: v.size,
-          color: v.color,
-          priceCents: Math.round(Number(v.price) * 100),
-        }));
+      const { product, variants: all } = await getCatalogProduct(productId);
+      templateName = product.title;
+      variants = all.map((v) => ({
+        id: v.id,
+        name: v.name,
+        size: v.size,
+        color: v.color,
+        priceCents: Math.round(Number(v.price) * 100),
+      }));
     } catch (e) {
       variantsError = `Couldn't load Printful variants: ${e instanceof Error ? e.message : String(e)}`;
     }
   } else {
-    variantsError = "No Printful variant IDs configured for this template yet (see templates.ts).";
+    variantsError = "This composition has no valid Printful product.";
   }
 
   return (
     <FinalizeForm
       compositionId={comp.id}
       previewUrl={comp.previewUrl}
-      templateName={tpl?.name ?? comp.templateKey}
-      placements={tpl?.placements ?? ["front"]}
+      templateName={templateName}
+      placements={["front", "back", "embroidery_front"]}
       defaultPlacement={comp.placement}
       variants={variants}
       variantsError={variantsError}

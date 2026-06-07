@@ -220,11 +220,39 @@ export interface PrintfulCatalogProduct {
   variant_count: number;
 }
 
-// GET /products/{id} → catalog product + its variants (for filling templates.ts).
+// GET /products/{id} → catalog product + its variants.
 export async function getCatalogProduct(
   id: number,
 ): Promise<{ product: PrintfulCatalogProduct; variants: PrintfulCatalogVariant[] }> {
   return request<{ product: PrintfulCatalogProduct; variants: PrintfulCatalogVariant[] }>(
     `/products/${id}`,
   );
+}
+
+// ---------- Full catalog browsing (admin design tool) ----------
+
+export interface PrintfulCatalogListProduct {
+  id: number;
+  main_category_id: number;
+  type: string;
+  type_name: string;
+  title: string;
+  image: string;
+  variant_count: number;
+  is_discontinued: boolean;
+}
+
+export async function listCatalogProducts(): Promise<PrintfulCatalogListProduct[]> {
+  return request<PrintfulCatalogListProduct[]>("/products");
+}
+
+export interface PrintfulCategory {
+  id: number;
+  parent_id: number;
+  title: string;
+}
+
+export async function listCategories(): Promise<PrintfulCategory[]> {
+  const r = await request<{ categories: PrintfulCategory[] }>("/categories");
+  return r.categories;
 }
