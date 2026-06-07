@@ -314,6 +314,28 @@ export async function getMockupTask(taskKey: string): Promise<MockupTaskResult> 
   return { status: r.status, mockups: r.mockups ?? [], error: r.error };
 }
 
+// Render one or more placements at once → { placement: mockup_url }.
+export async function renderMockups(
+  productId: number,
+  variantId: number,
+  files: MockupFile[],
+  { attempts = 24, intervalMs = 1500 }: { attempts?: number; intervalMs?: number } = {},
+): Promise<Record<string, string>> {
+  const key = await createMockupTask(productId, { variant_ids: [variantId], files });
+  for (let i = 0; i < attempts; i++) {
+    const res = await getMockupTask(key);
+    if (res.status === "completed") {
+      const out: Record<string, string> = {};
+      for (const m of res.mockups) if (m.mockup_url) out[m.placement] = m.mockup_url;
+      if (!Object.keys(out).length) throw new Error("Mockup completed but returned no images");
+      return out;
+    }
+    if (res.status === "failed") throw new Error(res.error || "Mockup task failed");
+    await new Promise((s) => setTimeout(s, intervalMs));
+  }
+  throw new Error("Mockup task timed out");
+}
+
 // Convenience: create a single-placement mockup and poll until done.
 export async function renderMockup(
   productId: number,

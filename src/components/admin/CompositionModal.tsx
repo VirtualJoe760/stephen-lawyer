@@ -1,7 +1,7 @@
 "use client";
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-import { PlacementEditor, type InitialPosition } from "./PlacementEditor";
+import { PlacementEditor } from "./PlacementEditor";
 
 interface Comp {
   id: string;
@@ -9,9 +9,6 @@ interface Comp {
   status: string;
   errorMessage: string | null;
   templateKey: string;
-  placement: string;
-  position: InitialPosition | null;
-  designUrl?: string;
 }
 
 export function CompositionModal({
@@ -29,7 +26,7 @@ export function CompositionModal({
   const [editorOpen, setEditorOpen] = useState(false);
 
   const productId = comp ? Number(comp.templateKey) : NaN;
-  const canEdit = Number.isFinite(productId) && !!comp?.designUrl;
+  const canEdit = Number.isFinite(productId);
 
   useEffect(() => {
     let active = true;
@@ -108,10 +105,6 @@ export function CompositionModal({
       {editorOpen && comp && canEdit ? (
         <PlacementEditor
           compositionId={comp.id}
-          productId={productId}
-          designUrl={comp.designUrl!}
-          initialPlacement={comp.placement}
-          initialPosition={comp.position}
           onSaved={(mockupUrl) => setComp((c) => (c ? { ...c, previewUrl: mockupUrl, status: "draft" } : c))}
           onClose={() => setEditorOpen(false)}
         />

@@ -1,7 +1,7 @@
 import { db } from "@/lib/db";
 import { compositions, designs } from "@/db/schema";
 import { requireAdminRoute } from "@/lib/admin/auth";
-import { eq } from "drizzle-orm";
+import { eq, inArray } from "drizzle-orm";
 
 type Ctx = { params: Promise<{ id: string }> };
 type Status = (typeof compositions.$inferInsert)["status"];
@@ -18,7 +18,23 @@ export async function GET(_req: Request, { params }: Ctx) {
     .from(designs)
     .where(eq(designs.id, c.designId))
     .limit(1);
-  return Response.json({ composition: { ...c, designUrl: d?.url, designThumbUrl: d?.thumbUrl } });
+  // Resolve each placement's design image for the editor.
+  const placementIds = [...new Set((c.placements ?? []).map((p) => p.designId))];
+  const pDesigns = placementIds.length
+    ? await db
+        .select({ id: designs.id, url: designs.url, thumbUrl: designs.thumbUrl })
+        .from(designs)
+        .where(inArray(designs.id, placementIds))
+    : [];
+  const dById = new Map(pDesigns.map((x) => [x.id, x]));
+  const placements = (c.placements ?? []).map((p) => ({
+    ...p,
+    designUrl: dById.get(p.designId)?.url,
+    designThumbUrl: dById.get(p.designId)?.thumbUrl,
+  }));
+  return Response.json({
+    composition: { ...c, designUrl: d?.url, designThumbUrl: d?.thumbUrl, placements },
+  });
 }
 
 export async function PATCH(req: Request, { params }: Ctx) {

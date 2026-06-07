@@ -5,7 +5,7 @@ import { getTemplate } from "@/lib/printful/templates";
 import { upscaleForPrint } from "@/lib/printful/upscale";
 import { createSyncProduct } from "@/lib/printful/client";
 import { syncPrintfulCatalog } from "@/lib/printful/sync";
-import { eq } from "drizzle-orm";
+import { eq, inArray } from "drizzle-orm";
 
 type Ctx = { params: Promise<{ id: string }> };
 
@@ -39,22 +39,39 @@ export async function POST(req: Request, { params }: Ctx) {
   const tpl = getTemplate(comp.templateKey);
   if (!tpl) return Response.json({ error: "Template not found" }, { status: 400 });
 
-  const placement = body?.placement?.trim() || comp.placement;
-  // Print file = raw design PNG, upscaled. NOT the review composite.
-  const printUrl = upscaleForPrint(design.cloudinaryPublicId);
+  const pfPos = (p: NonNullable<typeof comp.position>) => ({
+    area_width: p.areaWidth,
+    area_height: p.areaHeight,
+    width: p.width,
+    height: p.height,
+    top: p.top,
+    left: p.left,
+  });
 
-  // If the operator set an explicit size/placement, send it so production
-  // matches the preview. Otherwise Printful auto-fits (centered).
-  const position = comp.position
-    ? {
-        area_width: comp.position.areaWidth,
-        area_height: comp.position.areaHeight,
-        width: comp.position.width,
-        height: comp.position.height,
-        top: comp.position.top,
-        left: comp.position.left,
-      }
-    : undefined;
+  // Build print files: one per placement when multiple designs are set, else the
+  // single design. Print file = raw design PNG upscaled, NOT the review composite.
+  let files: Array<{ type: string; url: string; position?: ReturnType<typeof pfPos> }>;
+  if (comp.placements && comp.placements.length) {
+    const ids = [...new Set(comp.placements.map((p) => p.designId))];
+    const rows = await db.select().from(designs).where(inArray(designs.id, ids));
+    const pubIdById = new Map(rows.map((r) => [r.id, r.cloudinaryPublicId]));
+    files = comp.placements
+      .filter((p) => pubIdById.has(p.designId))
+      .map((p) => ({
+        type: p.placement,
+        url: upscaleForPrint(pubIdById.get(p.designId)!),
+        ...(p.position ? { position: pfPos(p.position) } : {}),
+      }));
+  } else {
+    const placement = body?.placement?.trim() || comp.placement;
+    files = [
+      {
+        type: placement,
+        url: upscaleForPrint(design.cloudinaryPublicId),
+        ...(comp.position ? { position: pfPos(comp.position) } : {}),
+      },
+    ];
+  }
 
   let syncProductId = "";
   try {
@@ -64,7 +81,7 @@ export async function POST(req: Request, { params }: Ctx) {
         sync_variants: variants.map((v) => ({
           variant_id: v.printfulVariantId,
           retail_price: (v.retailPriceCents / 100).toFixed(2),
-          files: [{ type: placement, url: printUrl, ...(position ? { position } : {}) }],
+          files,
         })),
       },
       comp.id, // idempotency key

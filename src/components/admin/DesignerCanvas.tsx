@@ -29,6 +29,7 @@ import { DesignerToolbar, type ToolMode } from "./DesignerToolbar";
 import { CombineDialog, type CombineTarget } from "./CombineDialog";
 import { MergeDialog, type MergeTarget } from "./MergeDialog";
 import { DesignPreviewModal } from "./DesignPreviewModal";
+import { AddPlacementDialog } from "./AddPlacementDialog";
 
 export interface CanvasNodeRow {
   id: string;
@@ -231,6 +232,7 @@ function DesignerInner({ catalogue, catalogues, initialNodes, designs, compositi
   const [combineTarget, setCombineTarget] = useState<CombineTarget | null>(null);
   const [mergeTarget, setMergeTarget] = useState<MergeTarget | null>(null);
   const [previewDesign, setPreviewDesign] = useState<DesignRow | null>(null);
+  const [addPlacement, setAddPlacement] = useState<{ compositionId: string; designId: string } | null>(null);
   const saveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const persist = useCallback(
@@ -470,6 +472,17 @@ function DesignerInner({ catalogue, catalogues, initialNodes, designs, compositi
           setMergeTarget({
             a: { designId: str(dragged.data, "designId"), thumbUrl: str(dragged.data, "thumbUrl") || undefined },
             b: { designId: str(other.data, "designId"), thumbUrl: str(other.data, "thumbUrl") || undefined },
+          });
+          return;
+        }
+        // Drag a design onto an existing composite → add it as another placement.
+        const comp = all.find(
+          (n) => n.type === "composition" && str(n.data, "compositionId") && overlaps(dBox, boxOf(n)),
+        );
+        if (comp) {
+          setAddPlacement({
+            compositionId: str(comp.data, "compositionId"),
+            designId: str(dragged.data, "designId"),
           });
           return;
         }
@@ -737,6 +750,26 @@ function DesignerInner({ catalogue, catalogues, initialNodes, designs, compositi
           prompt={previewDesign.prompt}
           onClose={() => setPreviewDesign(null)}
           onAdd={() => addDesign(previewDesign)}
+        />
+      ) : null}
+
+      {addPlacement ? (
+        <AddPlacementDialog
+          compositionId={addPlacement.compositionId}
+          designId={addPlacement.designId}
+          onClose={() => setAddPlacement(null)}
+          onAdded={(previewUrl) => {
+            const cid = addPlacement.compositionId;
+            setNodes((cur) => {
+              const next = cur.map((n) =>
+                n.type === "composition" && str(n.data, "compositionId") === cid
+                  ? { ...n, data: { ...n.data, previewUrl, status: "draft" } }
+                  : n,
+              );
+              persist(next);
+              return next;
+            });
+          }}
         />
       ) : null}
     </div>

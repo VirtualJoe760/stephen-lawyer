@@ -266,6 +266,15 @@ export const compositions = pgTable(
       top: number;
       left: number;
     }>(),
+    // Multiple designs on one product: one entry per print placement (front/back/
+    // sleeve/...). When set, this is authoritative over the single designId/placement.
+    placements: jsonb("placements").$type<
+      Array<{
+        placement: string;
+        designId: string;
+        position: { areaWidth: number; areaHeight: number; width: number; height: number; top: number; left: number } | null;
+      }>
+    >(),
     previewUrl: text("preview_url"),
     status: compositionStatus("status").notNull().default("generating"),
     printfulSyncProductId: text("printful_sync_product_id"),
