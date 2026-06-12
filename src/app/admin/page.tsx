@@ -6,6 +6,7 @@ export const dynamic = "force-dynamic";
 
 const CARDS = [
   { href: "/admin/designer", title: "Design Generator", desc: "Prompt designs, composite onto blanks, publish to the shop." },
+  { href: "/admin/products", title: "Products", desc: "Review, pause, and delete products in the shop." },
   { href: "/admin/catalogues", title: "Catalogues", desc: "Create and manage seasonal collections." },
   { href: "/", title: "View store ↗", desc: "Open the public storefront." },
 ];
