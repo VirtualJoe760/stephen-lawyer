@@ -4,12 +4,10 @@ import { notFound } from "next/navigation";
 import type { Metadata } from "next";
 import { ProductDetailView } from "@/components/product/product-detail-view";
 import { ProductCard } from "@/components/product/product-card";
-import { getMockProduct, getMockSummaries, MOCK_PRODUCTS } from "@/lib/mock-products";
+import { getStoreProduct, getStoreSummaries } from "@/lib/db-products";
 import { SITE_URL } from "@/lib/utils";
 
-export function generateStaticParams() {
-  return MOCK_PRODUCTS.map((p) => ({ slug: p.slug }));
-}
+export const dynamic = "force-dynamic";
 
 export async function generateMetadata({
   params,
@@ -17,7 +15,7 @@ export async function generateMetadata({
   params: Promise<{ slug: string }>;
 }): Promise<Metadata> {
   const { slug } = await params;
-  const product = getMockProduct(slug);
+  const product = await getStoreProduct(slug);
   if (!product) return {};
   return {
     title: product.name,
@@ -33,10 +31,10 @@ export async function generateMetadata({
 
 export default async function PDP({ params }: { params: Promise<{ slug: string }> }) {
   const { slug } = await params;
-  const product = getMockProduct(slug);
+  const product = await getStoreProduct(slug);
   if (!product) notFound();
 
-  const related = getMockSummaries(product.category)
+  const related = (await getStoreSummaries(product.category))
     .filter((p) => p.slug !== product.slug)
     .slice(0, 4);
 

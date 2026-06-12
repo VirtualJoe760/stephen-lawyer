@@ -1,7 +1,9 @@
 import { ShopPage } from "@/components/shop/shop-page";
-import { getMockSummaries } from "@/lib/mock-products";
+import { getStoreSummaries } from "@/lib/db-products";
 import { notFound } from "next/navigation";
 import type { Metadata } from "next";
+
+export const dynamic = "force-dynamic";
 
 const CATEGORIES = ["tees", "hoodies", "hats", "accessories"] as const;
 type Cat = (typeof CATEGORIES)[number];
@@ -12,10 +14,6 @@ const TITLES: Record<Cat, string> = {
   hats: "Hats",
   accessories: "Accessories",
 };
-
-export function generateStaticParams() {
-  return CATEGORIES.map((category) => ({ category }));
-}
 
 export async function generateMetadata({
   params,
@@ -30,6 +28,6 @@ export async function generateMetadata({
 export default async function CategoryPage({ params }: { params: Promise<{ category: string }> }) {
   const { category } = await params;
   if (!CATEGORIES.includes(category as Cat)) notFound();
-  const products = getMockSummaries(category);
+  const products = await getStoreSummaries(category as Cat);
   return <ShopPage products={products} title={TITLES[category as Cat]} category={category as Cat} />;
 }

@@ -84,6 +84,10 @@ export async function listSyncProducts(limit = 100): Promise<PrintfulSyncProduct
   return request<PrintfulSyncProduct[]>("/sync/products", { query: { limit } });
 }
 
+export async function deleteSyncProduct(id: number | string): Promise<void> {
+  await request<unknown>(`/store/products/${id}`, { method: "DELETE" });
+}
+
 export async function getSyncProduct(id: number): Promise<PrintfulSyncProductDetail> {
   return request<PrintfulSyncProductDetail>(`/sync/products/${id}`);
 }
@@ -185,7 +189,7 @@ export interface MockupPosition {
 }
 
 export interface CreateSyncProductInput {
-  sync_product: { name: string; thumbnail?: string };
+  sync_product: { name: string; thumbnail?: string; external_id?: string };
   sync_variants: Array<{
     variant_id: number; // Printful catalog variant id
     retail_price: string; // "29.99"
@@ -196,12 +200,16 @@ export interface CreateSyncProductInput {
 export async function createSyncProduct(
   input: CreateSyncProductInput,
   idempotencyKey?: string,
-): Promise<PrintfulSyncProductDetail> {
-  return request<PrintfulSyncProductDetail>("/store/products", {
+): Promise<{ sync_product: { id: number } }> {
+  // POST /store/products returns the created sync product. Depending on API
+  // version the id is either flat (`result.id`) or nested (`result.sync_product.id`).
+  const result = await request<{ id?: number; sync_product?: { id?: number } }>("/store/products", {
     method: "POST",
     body: input,
     idempotencyKey,
   });
+  const id = result?.sync_product?.id ?? result?.id ?? 0;
+  return { sync_product: { id } };
 }
 
 // ---------- Catalog variant lookup (for finalize pricing) ----------

@@ -1,0 +1,1 @@
+ALTER TABLE "products" ADD COLUMN "hero_image_url" text;

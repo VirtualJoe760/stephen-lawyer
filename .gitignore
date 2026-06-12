@@ -21,3 +21,6 @@ temp_images
 .env*.local
 
 *.tsbuildinfo
+
+# stray local secrets dump
+env.txt

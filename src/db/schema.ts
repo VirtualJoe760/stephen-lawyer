@@ -111,6 +111,7 @@ export const products = pgTable(
     name: text("name").notNull(),
     descriptionMd: text("description_md"),
     category: productCategory("category").notNull(),
+    heroImageUrl: text("hero_image_url"), // durable Cloudinary mockup for the storefront
     isPublished: boolean("is_published").notNull().default(false),
     dropId: uuid("drop_id").references(() => drops.id),
     createdAt: timestamp("created_at").notNull().defaultNow(),

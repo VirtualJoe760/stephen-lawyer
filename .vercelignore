@@ -1,0 +1,5 @@
+env.txt
+.env
+.env.*
+scripts/
+docs/

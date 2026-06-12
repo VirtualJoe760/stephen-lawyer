@@ -72,24 +72,24 @@ export async function syncPrintfulCatalog(): Promise<SyncSummary> {
           .values({
             productId: productRow.id,
             printfulSyncVariantId: String(sv.id),
-            sku: sv.sku,
+            sku: sv.sku || String(sv.id),
             color: color ?? null,
             size: size ?? null,
             retailPriceCents: Math.round(Number(sv.retail_price) * 100),
             currency: sv.currency,
             inStock: sv.synced,
-            imageUrl: sv.product.image ?? sv.files?.[0]?.preview_url ?? null,
+            imageUrl: sv.files?.find((f) => f.preview_url)?.preview_url ?? sv.product.image ?? null,
           })
           .onConflictDoUpdate({
             target: variants.printfulSyncVariantId,
             set: {
-              sku: sv.sku,
+              sku: sv.sku || String(sv.id),
               color: color ?? null,
               size: size ?? null,
               retailPriceCents: Math.round(Number(sv.retail_price) * 100),
               currency: sv.currency,
               inStock: sv.synced,
-              imageUrl: sv.product.image ?? sv.files?.[0]?.preview_url ?? null,
+              imageUrl: sv.files?.find((f) => f.preview_url)?.preview_url ?? sv.product.image ?? null,
             },
           });
         summary.variantsUpserted++;
