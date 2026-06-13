@@ -39,10 +39,22 @@ export async function POST(req: Request, { params }: Ctx) {
   const denied = await requireAdminRoute();
   if (denied) return denied;
   const { id } = await params;
-  const body = (await req.json().catch(() => null)) as { position?: PositionInput } | null;
-  if (!body?.position) return Response.json({ error: "position required" }, { status: 400 });
+  const body = (await req.json().catch(() => null)) as {
+    placements?: { placement?: string; position?: PositionInput }[];
+    // legacy single-placement shape
+    placement?: string;
+    position?: PositionInput;
+  } | null;
+
+  let inputs = Array.isArray(body?.placements) ? body!.placements! : [];
+  if (!inputs.length && body?.placement && body?.position) inputs = [{ placement: body.placement, position: body.position }];
+  const placements = inputs
+    .filter((p): p is { placement: string; position: PositionInput } => Boolean(p.placement && p.position))
+    .map((p) => ({ placement: p.placement, position: clamp(p.position) }));
+  if (!placements.length) return Response.json({ error: "at least one placement + position required" }, { status: 400 });
+
   try {
-    const result = await republishProductDesign(id, clamp(body.position));
+    const result = await republishProductDesign(id, placements);
     return Response.json(result);
   } catch (e) {
     return Response.json({ error: e instanceof Error ? e.message : String(e) }, { status: 502 });
