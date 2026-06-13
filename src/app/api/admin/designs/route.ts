@@ -51,7 +51,10 @@ export async function POST(req: Request) {
 
   let uploaded;
   try {
-    uploaded = await uploadImage(png, { folder: `stephen-lawyer/designs/${cat.slug}` });
+    uploaded = await uploadImage(png, {
+      folder: `stephen-lawyer/designs/${cat.slug}`,
+      removeBackground: background === "transparent",
+    });
   } catch (e) {
     return Response.json(
       { error: `Upload failed: ${e instanceof Error ? e.message : String(e)}` },

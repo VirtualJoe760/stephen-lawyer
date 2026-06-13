@@ -17,6 +17,8 @@ export interface ProductDesignState {
   designUrl: string;
   areas: { placement: string; areaWidth: number; areaHeight: number }[];
   name: string;
+  blankProductId: number;
+  renderVariantId: number;
 }
 
 // Read a product's current design + the print areas, for the editor.
@@ -37,6 +39,8 @@ export async function readProductDesign(dbProductId: string): Promise<ProductDes
     designUrl: file.url,
     areas: pf.placements.map((x) => ({ placement: x.placement, areaWidth: x.areaWidth, areaHeight: x.areaHeight })),
     name: p.name,
+    blankProductId: cv.product_id,
+    renderVariantId: pf.variantId ?? sv.variant_id,
   };
 }
 

@@ -132,7 +132,10 @@ async function ensureDesign(catalogueId: string, d: Design): Promise<{ publicId:
   }
   console.log(`  · generating design ${d.key}…`);
   const png = await generateDesign(d.prompt, { background: d.background, aspectRatio: d.aspectRatio });
-  const up = await uploadImage(png, { folder: `stephen-lawyer/designs/${CATALOGUE.slug}` });
+  const up = await uploadImage(png, {
+    folder: `stephen-lawyer/designs/${CATALOGUE.slug}`,
+    removeBackground: d.background === "transparent",
+  });
   await db.insert(designs).values({
     catalogueId,
     prompt: label,
