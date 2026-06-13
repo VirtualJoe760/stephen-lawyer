@@ -1,5 +1,6 @@
 "use client";
 import { useEffect, useMemo, useState } from "react";
+import { ProductDesignEditor } from "./ProductDesignEditor";
 
 interface Row {
   id: string;
@@ -21,6 +22,7 @@ export function AdminProductsList() {
   const [busyId, setBusyId] = useState<string | null>(null);
   const [q, setQ] = useState("");
   const [filter, setFilter] = useState<Filter>("all");
+  const [editId, setEditId] = useState<string | null>(null);
 
   useEffect(() => {
     fetch("/api/admin/products")
@@ -134,6 +136,13 @@ export function AdminProductsList() {
             </a>
             <button
               disabled={busyId === r.id}
+              onClick={() => setEditId(r.id)}
+              className="shrink-0 rounded border border-bone/20 px-2.5 py-1.5 text-[11px] font-mono uppercase tracking-widest text-bone/70 hover:border-hazard hover:text-bone disabled:opacity-40"
+            >
+              Edit
+            </button>
+            <button
+              disabled={busyId === r.id}
               onClick={() => togglePause(r)}
               className="shrink-0 rounded border border-bone/20 px-2.5 py-1.5 text-[11px] font-mono uppercase tracking-widest text-bone/70 hover:border-hazard hover:text-bone disabled:opacity-40"
             >
@@ -150,6 +159,16 @@ export function AdminProductsList() {
         ))}
         {!shown.length ? <p className="p-4 text-sm text-bone/40">No products match.</p> : null}
       </div>
+
+      {editId ? (
+        <ProductDesignEditor
+          productId={editId}
+          onClose={() => setEditId(null)}
+          onSaved={(hero) =>
+            setRows((cur) => cur.map((x) => (x.id === editId ? { ...x, image: hero ?? x.image } : x)))
+          }
+        />
+      ) : null}
     </div>
   );
 }
