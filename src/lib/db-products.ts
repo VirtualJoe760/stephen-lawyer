@@ -1,8 +1,11 @@
 import "server-only";
-import { db } from "@/lib/db";
-import { products, variants } from "@/db/schema";
-import { and, desc, eq, inArray } from "drizzle-orm";
 import type { Category, ProductSummary, ProductDetail, ProductVariantOption } from "@/types";
+
+// Catalogue cutover: products now come from the Nanocrew platform API (the Nanocrew app is the
+// single source of truth) instead of this site's own database. Exported function signatures and
+// return types are unchanged, so the home, shop and product pages keep working as-is.
+const NANOCREW_API = (process.env.NANOCREW_API_BASE ?? "https://nanocrew-api.vercel.app").replace(/\/$/, "");
+const STORE_SLUG = process.env.NANOCREW_STORE_SLUG ?? "stephen-lawyer";
 
 // Best-effort color-name → hex (Printful color names). Falls back to a neutral.
 const COLOR_HEX: Record<string, string> = {
@@ -43,94 +46,133 @@ const CARE_BY_CAT: Record<Category, { materials: string; care: string; sizingNot
   accessories: { materials: "Heavy cotton canvas.", care: "Spot clean. Hand wash cold.", sizingNote: "One size." },
 };
 
-type ProductRow = typeof products.$inferSelect;
-type VariantRow = typeof variants.$inferSelect;
+// Nanocrew products carry a free-text category; map product names to this site's fixed set.
+function inferCategory(name: string): Category {
+  const n = name.toLowerCase();
+  if (/\b(hat|cap|beanie|bucket)\b/.test(n)) return "hats";
+  if (/hoodie|crew|pullover|sweat|zip/.test(n)) return "hoodies";
+  if (/\b(tote|bag|sticker|pin|patch|sock|mug|deck|accessor)/.test(n)) return "accessories";
+  return "tees";
+}
 
-function toSummary(p: ProductRow, vs: VariantRow[]): ProductSummary {
-  const prices = vs.map((v) => v.retailPriceCents).filter((n) => n > 0);
-  const colorNames = [...new Set(vs.map((v) => v.color).filter(Boolean) as string[])];
-  const firstImg = vs.find((v) => v.imageUrl)?.imageUrl ?? null;
-  const recent = Date.now() - new Date(p.createdAt).getTime() < 21 * 24 * 60 * 60 * 1000;
+type ApiRow = {
+  id: string;
+  slug: string;
+  name: string;
+  descriptionMd: string | null;
+  imageUrl: string | null;
+  modelShots?: string[] | null;
+  variantId?: string | null;
+  sku?: string | null;
+  color?: string | null;
+  size?: string | null;
+  retailPriceCents?: number | null;
+  inStock?: boolean | null;
+};
+type ApiProduct = {
+  id: string;
+  slug: string;
+  name: string;
+  descriptionMd: string | null;
+  images: string[];
+  variants: { id: string; sku: string | null; color: string | null; size: string | null; priceCents: number | null; inStock: boolean }[];
+};
+
+async function fetchProducts(): Promise<ApiProduct[]> {
+  try {
+    const res = await fetch(`${NANOCREW_API}/api/public/stores/${STORE_SLUG}/products`, {
+      next: { revalidate: 60 },
+    });
+    if (!res.ok) return [];
+    const data = (await res.json()) as { products?: ApiRow[] } | ApiRow[];
+    const rows: ApiRow[] = Array.isArray(data) ? data : data.products ?? [];
+    const byId = new Map<string, ApiProduct>();
+    for (const r of rows) {
+      let p = byId.get(r.id);
+      if (!p) {
+        p = {
+          id: r.id,
+          slug: r.slug,
+          name: r.name,
+          descriptionMd: r.descriptionMd ?? null,
+          images: [r.imageUrl, ...(r.modelShots ?? [])].filter((x): x is string => !!x),
+          variants: [],
+        };
+        byId.set(r.id, p);
+      }
+      if (r.variantId) {
+        p.variants.push({
+          id: r.variantId,
+          sku: r.sku ?? null,
+          color: r.color ?? null,
+          size: r.size ?? null,
+          priceCents: r.retailPriceCents ?? null,
+          inStock: r.inStock ?? true,
+        });
+      }
+    }
+    return [...byId.values()];
+  } catch {
+    return [];
+  }
+}
+
+function toSummary(p: ApiProduct): ProductSummary {
+  const prices = p.variants.map((v) => v.priceCents).filter((n): n is number => !!n && n > 0);
+  const colorNames = [...new Set(p.variants.map((v) => v.color).filter(Boolean) as string[])];
   return {
     id: p.id,
     slug: p.slug,
     name: p.name,
-    category: p.category as Category,
+    category: inferCategory(p.name),
     priceCents: prices.length ? Math.min(...prices) : 0,
-    currency: vs[0]?.currency ?? "USD",
-    primaryImage: p.heroImageUrl ?? firstImg ?? "",
-    hoverImage: undefined,
+    currency: "USD",
+    primaryImage: p.images[0] ?? "",
+    hoverImage: p.images[1],
     colors: colorNames.map((name) => ({ name, hex: hexFor(name) })),
-    badges: recent ? ["NEW"] : undefined,
   };
 }
 
 export async function getPublishedSummaries(category?: Category): Promise<ProductSummary[]> {
-  const where = category
-    ? and(eq(products.isPublished, true), eq(products.category, category))
-    : eq(products.isPublished, true);
-  const rows = await db.select().from(products).where(where).orderBy(desc(products.createdAt));
-  if (!rows.length) return [];
-  const ids = rows.map((r) => r.id);
-  const allVariants = await db.select().from(variants).where(inArray(variants.productId, ids));
-  const byProduct = new Map<string, VariantRow[]>();
-  for (const v of allVariants) {
-    const arr = byProduct.get(v.productId) ?? [];
-    arr.push(v);
-    byProduct.set(v.productId, arr);
-  }
-  return rows.map((p) => toSummary(p, byProduct.get(p.id) ?? []));
+  const sums = (await fetchProducts()).map(toSummary);
+  return category ? sums.filter((s) => s.category === category) : sums;
 }
 
 export async function getPublishedProduct(slug: string): Promise<ProductDetail | null> {
-  const [p] = await db
-    .select()
-    .from(products)
-    .where(and(eq(products.slug, slug), eq(products.isPublished, true)))
-    .limit(1);
+  const p = (await fetchProducts()).find((x) => x.slug === slug);
   if (!p) return null;
-  const vs = await db.select().from(variants).where(eq(variants.productId, p.id));
-  const summary = toSummary(p, vs);
-  const defaults = CARE_BY_CAT[p.category as Category];
-  const gallery = [...new Set([p.heroImageUrl, ...vs.map((v) => v.imageUrl)].filter(Boolean) as string[])];
-  const variantOptions: ProductVariantOption[] = vs.map((v) => ({
+  const summary = toSummary(p);
+  const care = CARE_BY_CAT[summary.category];
+  const gallery = p.images.length ? p.images : summary.primaryImage ? [summary.primaryImage] : [];
+  const variants: ProductVariantOption[] = p.variants.map((v) => ({
     id: v.id,
-    sku: v.sku,
+    sku: v.sku ?? v.id,
     color: v.color ?? "Default",
     colorHex: hexFor(v.color),
     size: v.size ?? "OS",
     inStock: v.inStock,
-    priceCents: v.retailPriceCents,
-    imageUrl: v.imageUrl ?? p.heroImageUrl ?? "",
+    priceCents: v.priceCents ?? summary.priceCents,
+    imageUrl: gallery[0] ?? "",
   }));
   return {
     ...summary,
     description: p.descriptionMd ?? "",
-    materials: defaults.materials,
-    care: defaults.care,
-    sizingNote: defaults.sizingNote,
-    gallery: gallery.length ? gallery : summary.primaryImage ? [summary.primaryImage] : [],
-    variants: variantOptions,
+    materials: care.materials,
+    care: care.care,
+    sizingNote: care.sizingNote,
+    gallery,
+    variants,
   };
 }
 
 export async function hasPublishedProducts(): Promise<boolean> {
-  const [row] = await db.select({ id: products.id }).from(products).where(eq(products.isPublished, true)).limit(1);
-  return Boolean(row);
+  return (await fetchProducts()).length > 0;
 }
 
-// Storefront accessors: use published DB products once any exist, else fall back
-// to the mock placeholders (so the shop never goes blank mid-migration).
+// Storefront accessors (kept for compatibility; now always Nanocrew-backed).
 export async function getStoreSummaries(category?: Category): Promise<ProductSummary[]> {
-  const { getMockSummaries } = await import("@/lib/mock-products");
-  if (await hasPublishedProducts()) return getPublishedSummaries(category);
-  return getMockSummaries(category);
+  return getPublishedSummaries(category);
 }
-
 export async function getStoreProduct(slug: string): Promise<ProductDetail | null> {
-  const live = await getPublishedProduct(slug);
-  if (live) return live;
-  if (await hasPublishedProducts()) return null; // live mode: unknown slug is a 404
-  const { getMockProduct } = await import("@/lib/mock-products");
-  return getMockProduct(slug) ?? null;
+  return getPublishedProduct(slug);
 }
