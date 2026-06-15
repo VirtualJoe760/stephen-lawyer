@@ -2,13 +2,13 @@ import Link from "next/link";
 import Image from "next/image";
 import { ProductCard } from "@/components/product/product-card";
 import { Button } from "@/components/ui/button";
-import { getMockSummaries } from "@/lib/mock-products";
+import { getStoreSummaries } from "@/lib/db-products";
 import { getJournalPosts, getLookbookEntries } from "@/lib/sanity/queries";
 import { formatDate } from "@/lib/utils";
 import { NewsletterForm } from "@/components/newsletter-form";
 
 export default async function Home() {
-  const products = getMockSummaries().slice(0, 4);
+  const products = (await getStoreSummaries()).slice(0, 4);
   const [journal, lookbook] = await Promise.all([getJournalPosts(3), getLookbookEntries()]);
 
   return (
