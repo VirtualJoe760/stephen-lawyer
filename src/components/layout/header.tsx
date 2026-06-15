@@ -48,13 +48,6 @@ export function Header() {
         </nav>
 
         <div className="flex items-center gap-4 md:gap-6">
-          <Link
-            href="/account"
-            aria-label="Account"
-            className="hidden md:block font-mono text-xs uppercase tracking-widest hover:text-hazard"
-          >
-            Account
-          </Link>
           <button
             type="button"
             onClick={openCart}
@@ -90,11 +83,6 @@ export function Header() {
                 </Link>
               </li>
             ))}
-            <li>
-              <Link href="/account" onClick={() => setMobileOpen(false)} className="block py-1">
-                Account
-              </Link>
-            </li>
           </ul>
         </nav>
       )}

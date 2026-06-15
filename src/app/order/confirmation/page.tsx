@@ -31,14 +31,8 @@ export default async function OrderConfirmation({
         )}
         <div className="flex flex-col sm:flex-row gap-3 justify-center">
           <Link
-            href="/account/orders"
-            className="h-12 px-6 inline-flex items-center justify-center bg-ink text-bone font-mono text-sm uppercase tracking-widest hover:bg-hazard hover:text-ink"
-          >
-            View order
-          </Link>
-          <Link
             href="/shop"
-            className="h-12 px-6 inline-flex items-center justify-center border-2 border-ink font-mono text-sm uppercase tracking-widest hover:bg-ink hover:text-bone"
+            className="h-12 px-6 inline-flex items-center justify-center bg-ink text-bone font-mono text-sm uppercase tracking-widest hover:bg-hazard hover:text-ink"
           >
             Keep shopping
           </Link>

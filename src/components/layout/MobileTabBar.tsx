@@ -15,16 +15,12 @@ const Image = ({ className }: IconProps) => (
 const Cart = ({ className }: IconProps) => (
   <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round"><path d="M3 4h2l2.5 12h10l2-8H6" /><circle cx="9" cy="20" r="1" /><circle cx="17" cy="20" r="1" /></svg>
 );
-const User = ({ className }: IconProps) => (
-  <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="8" r="3.5" /><path d="M5 20a7 7 0 0 1 14 0" /></svg>
-);
 
 const TABS = [
   { href: "/", label: "Home", Icon: Home, exact: true },
   { href: "/shop", label: "Shop", Icon: Bag },
   { href: "/lookbook", label: "Looks", Icon: Image },
   { href: "/cart", label: "Cart", Icon: Cart },
-  { href: "/account", label: "Account", Icon: User },
 ];
 
 export function MobileTabBar() {
