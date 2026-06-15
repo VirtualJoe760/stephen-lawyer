@@ -55,6 +55,15 @@ function inferCategory(name: string): Category {
   return "tees";
 }
 
+// Shape returned by GET {api}/api/public/stores/:slug/products — products with nested variants.
+type ApiVariant = {
+  id: string;
+  sku: string | null;
+  color: string | null;
+  size: string | null;
+  retailPriceCents: number | null;
+  inStock: boolean | null;
+};
 type ApiRow = {
   id: string;
   slug: string;
@@ -62,14 +71,9 @@ type ApiRow = {
   descriptionMd: string | null;
   imageUrl: string | null;
   modelShots?: string[] | null;
-  variantId?: string | null;
-  sku?: string | null;
-  color?: string | null;
-  size?: string | null;
-  retailPriceCents?: number | null;
-  inStock?: boolean | null;
+  variants?: ApiVariant[] | null;
 };
-type ApiProduct = {
+type Product = {
   id: string;
   slug: string;
   name: string;
@@ -78,7 +82,7 @@ type ApiProduct = {
   variants: { id: string; sku: string | null; color: string | null; size: string | null; priceCents: number | null; inStock: boolean }[];
 };
 
-async function fetchProducts(): Promise<ApiProduct[]> {
+async function fetchProducts(): Promise<Product[]> {
   try {
     const res = await fetch(`${NANOCREW_API}/api/public/stores/${STORE_SLUG}/products`, {
       next: { revalidate: 60 },
@@ -86,38 +90,27 @@ async function fetchProducts(): Promise<ApiProduct[]> {
     if (!res.ok) return [];
     const data = (await res.json()) as { products?: ApiRow[] } | ApiRow[];
     const rows: ApiRow[] = Array.isArray(data) ? data : data.products ?? [];
-    const byId = new Map<string, ApiProduct>();
-    for (const r of rows) {
-      let p = byId.get(r.id);
-      if (!p) {
-        p = {
-          id: r.id,
-          slug: r.slug,
-          name: r.name,
-          descriptionMd: r.descriptionMd ?? null,
-          images: [r.imageUrl, ...(r.modelShots ?? [])].filter((x): x is string => !!x),
-          variants: [],
-        };
-        byId.set(r.id, p);
-      }
-      if (r.variantId) {
-        p.variants.push({
-          id: r.variantId,
-          sku: r.sku ?? null,
-          color: r.color ?? null,
-          size: r.size ?? null,
-          priceCents: r.retailPriceCents ?? null,
-          inStock: r.inStock ?? true,
-        });
-      }
-    }
-    return [...byId.values()];
+    return rows.map((r) => ({
+      id: r.id,
+      slug: r.slug,
+      name: r.name,
+      descriptionMd: r.descriptionMd ?? null,
+      images: [r.imageUrl, ...(r.modelShots ?? [])].filter((x): x is string => !!x),
+      variants: (r.variants ?? []).map((v) => ({
+        id: v.id,
+        sku: v.sku ?? null,
+        color: v.color ?? null,
+        size: v.size ?? null,
+        priceCents: v.retailPriceCents ?? null,
+        inStock: v.inStock ?? true,
+      })),
+    }));
   } catch {
     return [];
   }
 }
 
-function toSummary(p: ApiProduct): ProductSummary {
+function toSummary(p: Product): ProductSummary {
   const prices = p.variants.map((v) => v.priceCents).filter((n): n is number => !!n && n > 0);
   const colorNames = [...new Set(p.variants.map((v) => v.color).filter(Boolean) as string[])];
   return {
