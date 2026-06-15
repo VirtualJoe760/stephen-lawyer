@@ -4,7 +4,7 @@ import { notFound } from "next/navigation";
 import type { Metadata } from "next";
 import { getLookbookEntry, getLookbookEntries } from "@/lib/sanity/queries";
 import { ProductCard } from "@/components/product/product-card";
-import { getMockSummaries } from "@/lib/mock-products";
+import { getStoreSummaries } from "@/lib/db-products";
 import { formatDate } from "@/lib/utils";
 
 export async function generateMetadata({
@@ -31,7 +31,7 @@ export default async function LookbookEntryPage({ params }: { params: Promise<{ 
   const { slug } = await params;
   const entry = await getLookbookEntry(slug);
   if (!entry) notFound();
-  const related = getMockSummaries().slice(0, 4);
+  const related = (await getStoreSummaries()).slice(0, 4);
 
   return (
     <article className="pb-20">

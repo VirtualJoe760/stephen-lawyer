@@ -1,6 +1,6 @@
 import type { MetadataRoute } from "next";
 import { SITE_URL } from "@/lib/utils";
-import { MOCK_PRODUCTS } from "@/lib/mock-products";
+import { getStoreSummaries } from "@/lib/db-products";
 import { getJournalPosts, getLookbookEntries } from "@/lib/sanity/queries";
 
 type Entry = MetadataRoute.Sitemap[number];
@@ -13,7 +13,11 @@ const LEGAL = ["/privacy", "/terms"];
 const CATEGORIES = ["tees", "hoodies", "hats", "accessories"];
 
 export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
-  const [journal, lookbook] = await Promise.all([getJournalPosts(50), getLookbookEntries()]);
+  const [products, journal, lookbook] = await Promise.all([
+    getStoreSummaries(),
+    getJournalPosts(50),
+    getLookbookEntries(),
+  ]);
   const now = new Date();
 
   const entries: Entry[] = [
@@ -29,7 +33,7 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
       changeFrequency: "weekly" as const,
       priority: 0.8,
     })),
-    ...MOCK_PRODUCTS.map((p) => ({
+    ...products.map((p) => ({
       url: `${SITE_URL}/product/${p.slug}`,
       lastModified: now,
       changeFrequency: "weekly" as const,
