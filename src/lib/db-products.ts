@@ -134,17 +134,12 @@ export async function hasPublishedProducts(): Promise<boolean> {
   return (await fetchProducts()).length > 0;
 }
 
-// Storefront accessors: use live Nanocrew products once any exist, else the mock placeholders.
+// Storefront accessors: the live Nano Crew catalogue is the single source of truth. No mock data —
+// if the platform has no products the storefront shows an empty state (template behavior).
 export async function getStoreSummaries(category?: Category): Promise<ProductSummary[]> {
-  if (await hasPublishedProducts()) return getPublishedSummaries(category);
-  const { getMockSummaries } = await import("@/lib/mock-products");
-  return getMockSummaries(category);
+  return getPublishedSummaries(category);
 }
 
 export async function getStoreProduct(slug: string): Promise<ProductDetail | null> {
-  const live = await getPublishedProduct(slug);
-  if (live) return live;
-  if (await hasPublishedProducts()) return null; // live mode: unknown slug is a 404
-  const { getMockProduct } = await import("@/lib/mock-products");
-  return getMockProduct(slug) ?? null;
+  return (await getPublishedProduct(slug)) ?? null;
 }
