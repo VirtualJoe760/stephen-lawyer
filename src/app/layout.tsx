@@ -10,6 +10,7 @@ import { SITE_URL } from "@/lib/utils";
 import { JsonLd } from "@/components/seo/json-ld";
 import { organizationSchema, websiteSchema } from "@/lib/seo";
 import { PWARegister } from "@/components/pwa-register";
+import { getBrandColors } from "@/lib/site-config";
 
 const display = Anton({ weight: "400", subsets: ["latin"], variable: "--font-anton", display: "swap" });
 const sans = Inter({ subsets: ["latin"], variable: "--font-inter", display: "swap" });
@@ -74,9 +75,18 @@ export const viewport: Viewport = {
   initialScale: 1,
 };
 
-export default function RootLayout({ children }: { children: React.ReactNode }) {
+export default async function RootLayout({ children }: { children: React.ReactNode }) {
+  // Mini-CMS: live color overrides (Studio → ✦ Customize) injected as CSS vars. globals.css maps
+  // bone/ink/hazard to these with the brand hex as fallback, so the look is unchanged until edited.
+  const c = await getBrandColors();
+  const brandVars = {
+    "--brand-background": c.background,
+    "--brand-text": c.text,
+    "--brand-primary": c.primary,
+    "--brand-accent": c.accent,
+  } as React.CSSProperties;
   return (
-    <html lang="en" className={`${display.variable} ${sans.variable} ${mono.variable}`}>
+    <html lang="en" className={`${display.variable} ${sans.variable} ${mono.variable}`} style={brandVars}>
       <body className="min-h-screen flex flex-col bg-bone text-ink">
         <JsonLd data={[organizationSchema(), websiteSchema()]} />
         <PWARegister />

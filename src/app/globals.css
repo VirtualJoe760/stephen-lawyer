@@ -1,14 +1,17 @@
 @import "tailwindcss";
 
 @theme {
-  --color-bone: #f4f1ea;
+  /* bone (bg) / ink (text) / hazard (accent) are the mini-CMS-editable roles: they read the live
+     --brand-* vars injected by layout.tsx, falling back to the brand hex so nothing changes until a
+     creator customizes in Studio. The other shades stay fixed. */
+  --color-bone: var(--brand-background, #f4f1ea);
   --color-bone-50: #faf8f2;
   --color-bone-100: #f4f1ea;
   --color-bone-200: #e8e3d5;
-  --color-ink: #0f0f0f;
+  --color-ink: var(--brand-text, #0f0f0f);
   --color-ink-soft: #1a1a1a;
   --color-ink-line: #2a2a2a;
-  --color-hazard: #ff4a1c;
+  --color-hazard: var(--brand-accent, #ff4a1c);
   --color-acid: #c8ff3f;
   --color-cobalt: #1f3dff;
   --color-pink: #ff2ea0;
