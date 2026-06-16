@@ -1,7 +1,7 @@
 import type { MetadataRoute } from "next";
 import { SITE_URL } from "@/lib/utils";
 import { getStoreSummaries } from "@/lib/db-products";
-import { getJournalPosts, getLookbookEntries } from "@/lib/sanity/queries";
+import { getJournalPosts, getLookbookEntries } from "@/lib/content";
 
 type Entry = MetadataRoute.Sitemap[number];
 

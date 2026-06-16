@@ -1,4 +1,4 @@
-import { getTickerItems } from "@/lib/sanity/queries";
+import { getTickerItems } from "@/lib/content";
 
 export async function NewsTicker() {
   const items = await getTickerItems();

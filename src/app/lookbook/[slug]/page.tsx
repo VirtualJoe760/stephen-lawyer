@@ -2,7 +2,7 @@ import Image from "next/image";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import type { Metadata } from "next";
-import { getLookbookEntry, getLookbookEntries } from "@/lib/sanity/queries";
+import { getLookbookEntry, getLookbookEntries } from "@/lib/content";
 import { ProductCard } from "@/components/product/product-card";
 import { getStoreSummaries } from "@/lib/db-products";
 import { formatDate } from "@/lib/utils";

@@ -3,7 +3,7 @@ import Image from "next/image";
 import { ProductCard } from "@/components/product/product-card";
 import { Button } from "@/components/ui/button";
 import { getStoreSummaries } from "@/lib/db-products";
-import { getJournalPosts, getLookbookEntries } from "@/lib/sanity/queries";
+import { getJournalPosts, getLookbookEntries } from "@/lib/content";
 import { formatDate } from "@/lib/utils";
 import { NewsletterForm } from "@/components/newsletter-form";
 

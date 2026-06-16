@@ -2,8 +2,8 @@ import Image from "next/image";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import type { Metadata } from "next";
-import { PortableText, type PortableTextComponents } from "@portabletext/react";
-import { getJournalPost, getJournalPosts } from "@/lib/sanity/queries";
+import ReactMarkdown, { type Components } from "react-markdown";
+import { getJournalPost, getJournalPosts } from "@/lib/content";
 import { formatDate, SITE_URL } from "@/lib/utils";
 
 export async function generateMetadata({
@@ -27,22 +27,18 @@ export async function generateStaticParams() {
   return posts.map((p) => ({ slug: p.slug }));
 }
 
-const components: PortableTextComponents = {
-  block: {
-    h2: ({ children }) => <h2 className="wordmark text-3xl md:text-4xl mt-12 mb-4">{children}</h2>,
-    h3: ({ children }) => <h3 className="wordmark text-2xl mt-8 mb-3">{children}</h3>,
-    blockquote: ({ children }) => (
-      <blockquote className="border-l-4 border-hazard pl-6 my-8 text-2xl font-display uppercase leading-snug">
-        {children}
-      </blockquote>
-    ),
-    normal: ({ children }) => <p className="text-base leading-relaxed mb-4">{children}</p>,
-  },
-  marks: {
-    link: ({ children, value }) => (
-      <a href={value?.href} className="underline hover:text-hazard">{children}</a>
-    ),
-  },
+// Markdown rendering for journal posts (bodies come from the Nano Crew platform as markdown).
+const components: Components = {
+  h2: ({ children }) => <h2 className="wordmark text-3xl md:text-4xl mt-12 mb-4">{children}</h2>,
+  h3: ({ children }) => <h3 className="wordmark text-2xl mt-8 mb-3">{children}</h3>,
+  blockquote: ({ children }) => (
+    <blockquote className="border-l-4 border-hazard pl-6 my-8 text-2xl font-display uppercase leading-snug">
+      {children}
+    </blockquote>
+  ),
+  p: ({ children }) => <p className="text-base leading-relaxed mb-4">{children}</p>,
+  a: ({ href, children }) => <a href={href} className="underline hover:text-hazard">{children}</a>,
+  ul: ({ children }) => <ul className="list-disc pl-6 mb-4 space-y-1">{children}</ul>,
 };
 
 export default async function JournalPost({ params }: { params: Promise<{ slug: string }> }) {
@@ -77,14 +73,13 @@ export default async function JournalPost({ params }: { params: Promise<{ slug: 
           </p>
           <h1 className="wordmark text-5xl md:text-7xl leading-[0.85] mt-2 mb-8">{post.title}</h1>
           {post.excerpt && <p className="text-xl leading-snug mb-10 text-ink/80">{post.excerpt}</p>}
-          {Array.isArray(post.body) ? (
+          {post.body ? (
             <div className="prose-stephen">
-              <PortableText value={post.body as never} components={components} />
+              <ReactMarkdown components={components}>{post.body}</ReactMarkdown>
             </div>
           ) : (
-            <p className="text-base leading-relaxed">
-              {/* Fallback body when Sanity isn't wired yet. */}
-              Full post coming soon. This article was queued for the next editorial pass.
+            <p className="text-base leading-relaxed text-ink/70">
+              Full post coming soon.
             </p>
           )}
         </div>

@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 import Image from "next/image";
-import { getAboutContent } from "@/lib/sanity/queries";
+import { getAboutContent } from "@/lib/content";
 
 export const metadata: Metadata = {
   title: "About",

@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import { getFaqs } from "@/lib/sanity/queries";
+import { getFaqs } from "@/lib/content";
 import { Accordion } from "@/components/ui/accordion";
 
 export const metadata: Metadata = {
