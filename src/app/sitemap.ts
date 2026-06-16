@@ -19,6 +19,12 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     getLookbookEntries(),
   ]);
   const now = new Date();
+  // Lookbook entries are app-driven and carry no date; some journal dates can be empty too — fall
+  // back to `now` so the sitemap never throws on an invalid Date.
+  const when = (s: string) => {
+    const d = new Date(s);
+    return Number.isNaN(d.getTime()) ? now : d;
+  };
 
   const entries: Entry[] = [
     ...PRIMARY.map((p) => ({
@@ -47,13 +53,13 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     })),
     ...journal.map((p) => ({
       url: `${SITE_URL}/journal/${p.slug}`,
-      lastModified: new Date(p.publishedAt),
+      lastModified: when(p.publishedAt),
       changeFrequency: "monthly" as const,
       priority: 0.5,
     })),
     ...lookbook.map((l) => ({
       url: `${SITE_URL}/lookbook/${l.slug}`,
-      lastModified: new Date(l.publishedAt),
+      lastModified: when(l.publishedAt),
       changeFrequency: "monthly" as const,
       priority: 0.5,
     })),

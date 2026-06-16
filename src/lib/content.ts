@@ -31,17 +31,49 @@ const ABOUT = {
 
 export interface LookbookEntry { _id: string; title: string; slug: string; intro: string; publishedAt: string; heroImage: string; images: string[] }
 
-const LOOKBOOK: LookbookEntry[] = [
-  { _id: "1", title: "Summer 26 / Hazard", slug: "summer-26-hazard", intro: "Loud colors, louder pads. Shot over four days in Encinitas and downtown LA.", publishedAt: "2026-05-01", heroImage: "https://images.unsplash.com/photo-1571945153237-4929e783af4a?w=1800&q=85", images: ["https://images.unsplash.com/photo-1517457373958-b7bdd4587205?w=1400&q=85", "https://images.unsplash.com/photo-1502810190503-8303352d0dd1?w=1400&q=85", "https://images.unsplash.com/photo-1580130544577-e6ac2974f9b3?w=1400&q=85"] },
-  { _id: "2", title: "Winter 25 / Spitfire", slug: "winter-25-spitfire", intro: "On tour with the Spitfire team. Mexico, Spain, the back room at a Madrid skate shop.", publishedAt: "2025-12-12", heroImage: "https://images.unsplash.com/photo-1531565637446-32307b194362?w=1800&q=85", images: ["https://images.unsplash.com/photo-1518929458119-e5bf444c30f4?w=1400&q=85", "https://images.unsplash.com/photo-1502810190503-8303352d0dd1?w=1400&q=85"] },
-];
-
 export async function getTickerItems(): Promise<string[]> { return TICKER; }
 export async function getFaqs(): Promise<FaqItem[]> { return FAQ; }
 export async function getAboutContent(): Promise<{ headline: string; body: string }> { return ABOUT; }
-export async function getLookbookEntries(): Promise<LookbookEntry[]> { return LOOKBOOK; }
+
+// The lookbook is DRIVEN BY THE APP (no static/stock imagery). Each active collection with published
+// products becomes a lookbook entry: hero = the collection cover set in Studio, else a product shot
+// from that collection; the spread is that collection's product imagery (on-model shots preferred).
+// Assign a collection cover or product model shots in the app and the lookbook updates with no code
+// change. An entry only appears once it has at least one real image — so there's nothing to show
+// until the catalogue has imagery, but it's never a placeholder.
+type ApiCollection = { slug: string; name: string; season: string | null; coverImageUrl: string | null; count: number };
+type ApiProductLite = { slug: string; imageUrl: string | null; modelShots?: string[] | null; collection?: { slug: string; name: string } | null };
+
+async function buildLookbook(): Promise<LookbookEntry[]> {
+  const [colsRes, prodsRes] = await Promise.all([
+    fromApi<{ collections: ApiCollection[] }>(`/api/public/stores/${brand.slug}/collections`),
+    fromApi<{ products: ApiProductLite[] }>(`/api/public/stores/${brand.slug}/products`),
+  ]);
+  const cols = colsRes?.collections ?? [];
+  const prods = prodsRes?.products ?? [];
+  return cols
+    .map((c) => {
+      const inCol = prods.filter((p) => p.collection?.slug === c.slug);
+      const shots = inCol
+        .flatMap((p) => [...(p.modelShots ?? []), p.imageUrl])
+        .filter((x): x is string => Boolean(x));
+      const hero = c.coverImageUrl ?? shots[0] ?? "";
+      return {
+        _id: c.slug,
+        title: c.name,
+        slug: c.slug,
+        intro: c.season ? c.season : `${c.count} piece${c.count === 1 ? "" : "s"} in the drop.`,
+        publishedAt: "",
+        heroImage: hero,
+        images: shots.filter((s) => s !== hero).slice(0, 4),
+      };
+    })
+    .filter((e) => e.heroImage);
+}
+
+export async function getLookbookEntries(): Promise<LookbookEntry[]> { return buildLookbook(); }
 export async function getLookbookEntry(slug: string): Promise<LookbookEntry | null> {
-  return LOOKBOOK.find((l) => l.slug === slug) ?? null;
+  return (await buildLookbook()).find((l) => l.slug === slug) ?? null;
 }
 
 // ---------- Journal — LIVE from the Nano Crew platform (store_posts) ----------
