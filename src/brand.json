@@ -1,0 +1,27 @@
+{
+  "storeId": "f8399486-0b9c-47b5-8861-4cf5e71b83f6",
+  "slug": "stephen-lawyer",
+  "name": "Stephen Lawyer",
+  "tagline": "Skate-born streetwear from the flagship crew.",
+  "logoUrl": "",
+  "palette": {
+    "primary": "#0f0f0f",
+    "secondary": "#e8e3d5",
+    "accent": "#ff4a1c",
+    "background": "#f4f1ea",
+    "text": "#0f0f0f"
+  },
+  "typography": { "display": "bold grotesk", "body": "clean sans" },
+  "designStyle": "bold",
+  "voice": "raw, confident, skate-born",
+  "story": "Skate-born streetwear from the flagship crew.",
+  "vibeKeywords": ["skate", "streetwear", "raw", "bold"],
+  "products": [],
+  "social": {},
+  "apiBase": "https://nanocrew-api.vercel.app",
+  "platform": {
+    "supabaseUrl": "https://texlnosjjjcavhtvrlka.supabase.co",
+    "supabaseAnonKey": "sb_publishable_v0OTjJ7xE-jSTCfmlssOyw_OJZeYemE"
+  },
+  "commerce": { "feeWaiveCents": 20000, "feePct": 0.029 }
+}

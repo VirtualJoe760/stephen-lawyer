@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
 import { SITE_URL } from "@/lib/utils";
+import { brand } from "@/lib/brand";
 
 // Checkout runs on the Nanocrew platform now (Stripe Connect + processing fee + Printful
 // fulfillment all happen there). This route maps the cart to Nanocrew variant ids by
@@ -20,8 +21,8 @@ const lineSchema = z.object({
 });
 const bodySchema = z.object({ items: z.array(lineSchema).min(1) });
 
-const API = process.env.NANOCREW_API;
-const STORE_SLUG = "stephen-lawyer";
+const API = brand.apiBase;
+const STORE_SLUG = brand.slug;
 
 export async function POST(req: Request) {
   try {

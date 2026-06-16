@@ -1,13 +1,14 @@
 "use client";
 
-// "Login with Nanocrew" for the store /admin — the SAME Supabase account as the
-// Nanocrew app, via the REST API (no SDK). Magic-link (works for Google-auth
-// creators) or password. Config comes from public env vars, since this bespoke
-// site has no brand.json (a template site reads brand.platform.* instead).
+import { brand } from "@/lib/brand";
 
-const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL ?? "";
-const SUPABASE_ANON = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY ?? "";
-const API_BASE = process.env.NEXT_PUBLIC_NANOCREW_API ?? "";
+// "Login with Nano Crew" for the store /admin — the SAME Supabase account as the
+// Nano Crew app, via the REST API (no SDK). Magic-link (works for Google-auth
+// creators) or password. Config now comes from brand.json (env-less, like a template).
+
+const SUPABASE_URL = brand.platform.supabaseUrl;
+const SUPABASE_ANON = brand.platform.supabaseAnonKey;
+const API_BASE = brand.apiBase;
 
 const TOKEN_KEY = "storefront.adminToken";
 

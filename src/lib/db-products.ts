@@ -1,13 +1,15 @@
 import "server-only";
 import type { Category, ProductSummary, ProductDetail, ProductVariantOption } from "@/types";
+import { brand } from "@/lib/brand";
 
-// Products now come from the Nanocrew platform (single source of truth for catalog + price +
+// Products come from the Nano Crew platform (single source of truth for catalog + price +
 // fulfillment), not this site's own DB. We fetch the public catalog and map it to the storefront's
 // types. Apparel category (for care/sizing copy) is inferred from the product name, since the
-// Nanocrew catalog is brand-agnostic. See NANOCREW.md.
+// Nano Crew catalog is brand-agnostic. Config (apiBase + slug) comes from brand.json — env-less,
+// like a Nano Crew template.
 
-const API = process.env.NANOCREW_API;
-const STORE_SLUG = "stephen-lawyer";
+const API = brand.apiBase;
+const STORE_SLUG = brand.slug;
 
 // Printful color-name → hex; falls back to a neutral.
 const COLOR_HEX: Record<string, string> = {
